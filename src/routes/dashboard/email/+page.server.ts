@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { RESEND_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const session = await locals.getSession();
@@ -25,7 +25,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	return {
 		campaigns: campaigns || [],
 		customers: customers || [],
-		hasResendKey: !!RESEND_API_KEY
+		hasResendKey: !!env.RESEND_API_KEY
 	};
 };
 
@@ -80,7 +80,7 @@ export const actions = {
 			return fail(401, { message: '認証が必要です' });
 		}
 
-		if (!RESEND_API_KEY) {
+		if (!env.RESEND_API_KEY) {
 			return fail(400, { message: 'Resend APIキーが設定されていません' });
 		}
 
@@ -126,7 +126,7 @@ export const actions = {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
-						Authorization: `Bearer ${RESEND_API_KEY}`
+						Authorization: `Bearer ${env.RESEND_API_KEY}`
 					},
 					body: JSON.stringify({
 						from: 'onboarding@resend.dev', // 実際の送信元アドレスに変更

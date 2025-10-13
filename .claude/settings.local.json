@@ -31,7 +31,10 @@
       "WebSearch",
       "WebFetch(domain:sipe-selye.co.jp)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
