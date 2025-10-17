@@ -21,20 +21,6 @@
 	// 背景画像の設定
 	$: backgroundImage = section.style?.backgroundImage;
 
-	// デバッグ用（開発時のみ）
-	$: if (backgroundImage) {
-		console.log('HeroSection backgroundImage:', {
-			url: backgroundImage.url,
-			positionX: backgroundImage.positionX,
-			positionY: backgroundImage.positionY,
-			size: backgroundImage.size,
-			rotation: backgroundImage.rotation
-		});
-		if (backgroundImage.url && typeof backgroundImage.url !== 'string') {
-			console.error('Background image URL is not a string:', typeof backgroundImage.url, backgroundImage.url);
-		}
-	}
-
 	// 背景画像のURL（安全にstring型に変換）
 	$: bgUrl = (() => {
 		if (!backgroundImage?.url) return '';
@@ -134,7 +120,7 @@
 
 		{#if content.buttonText && content.buttonLink}
 			<a
-				href={content.buttonLink}
+				href={typeof content.buttonLink === 'string' ? content.buttonLink : '#'}
 				class="inline-block px-8 py-4 bg-blue-600 text-white rounded-lg font-semibold text-lg hover:bg-blue-700 transition shadow-lg"
 			>
 				{content.buttonText}
