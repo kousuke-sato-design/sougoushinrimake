@@ -5,7 +5,6 @@
 	export let section: GallerySection;
 
 	$: content = section.content;
-	$: columns = content.columns || 3;
 </script>
 
 <section class="{SPACING.section} {SPACING.container}">
@@ -22,21 +21,32 @@
 			</p>
 		{/if}
 
-		<div class="grid md:grid-cols-{columns} gap-6 mt-8">
+		<!-- レスポンシブグリッド: モバイル1列、タブレット2列、デスクトップ3列 -->
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
 			{#each content.images as image}
-				<div class="group relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition">
-					<img
-						src={image.url}
-						alt={image.alt}
-						class="w-full h-64 object-cover group-hover:scale-105 transition duration-300"
-					/>
-					{#if image.caption}
-						<div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-							<p class="text-white text-sm font-medium">{image.caption}</p>
-						</div>
-					{/if}
-				</div>
+				{#if image.url}
+					<div class="group relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-all duration-300 bg-transparent">
+						<img
+							src={image.url}
+							alt={image.alt || ''}
+							class="w-full h-64 object-contain group-hover:scale-105 transition-transform duration-300"
+							style="background: transparent;"
+							loading="lazy"
+						/>
+						{#if image.caption}
+							<div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+								<p class="text-white text-sm font-medium">{image.caption}</p>
+							</div>
+						{/if}
+					</div>
+				{/if}
 			{/each}
 		</div>
+
+		{#if !content.images || content.images.length === 0}
+			<div class="text-center py-12 text-gray-400">
+				<p class="text-sm">画像がまだ追加されていません</p>
+			</div>
+		{/if}
 	</div>
 </section>

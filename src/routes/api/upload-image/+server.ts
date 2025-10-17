@@ -37,12 +37,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const extension = file.name.split('.').pop();
 		const fileName = `${user.id}/${landingPageId || 'general'}/${timestamp}.${extension}`;
 
-		// Supabase Storageにアップロード
+		// Supabase Storageにアップロード（Content-Typeを明示的に指定）
 		const { data, error } = await locals.supabase.storage
 			.from('lp-images')
 			.upload(fileName, file, {
 				cacheControl: '3600',
-				upsert: false
+				upsert: false,
+				contentType: file.type // PNG透過背景を正しく処理するため明示的に指定
 			});
 
 		if (error) {

@@ -29,7 +29,23 @@
 	<meta name="description" content={data.landingPage.description || data.landingPage.title} />
 </svelte:head>
 
-<div class="bg-white min-h-full">
+<!-- デバッグボタン（一時的・右下に固定） -->
+<button
+	on:click={() => {
+		console.log('=== Published Page Sections Data ===');
+		console.log(JSON.stringify(sections, null, 2));
+		sections.forEach((section, index) => {
+			console.log(`\n=== Section ${index} (${section.type}) ===`);
+			console.log('Background Image:', section.style?.backgroundImage);
+		});
+	}}
+	class="fixed bottom-4 right-4 z-50 px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition text-sm shadow-lg"
+	style="z-index: 9999;"
+>
+	🐛 デバッグ
+</button>
+
+<div class="bg-white min-h-screen w-full">
 	{#if sections.length === 0}
 		<div class="flex items-center justify-center h-96 text-gray-400">
 			<div class="text-center">

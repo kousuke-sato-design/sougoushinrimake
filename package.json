@@ -26,6 +26,7 @@
     "@supabase/ssr": "^0.1.0",
     "@supabase/supabase-js": "^2.39.0",
     "lucide-svelte": "^0.545.0",
+    "svelte-dnd-action": "^0.9.65",
     "zod": "^3.22.4"
   },
   "type": "module"

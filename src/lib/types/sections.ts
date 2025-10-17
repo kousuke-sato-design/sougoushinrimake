@@ -27,10 +27,18 @@ export interface BaseSection {
 	// スタイル設定
 	style?: {
 		backgroundColor?: string; // 背景色
-		backgroundImage?: string; // 背景画像URL
-		backgroundImageOpacity?: number; // 背景画像の透明度 (0-1)
 		textColor?: string; // テキスト色
 		padding?: string; // パディング
+		backgroundImage?: {
+			url: string; // 画像URL
+			opacity: number; // 透過度 (0-100)
+			position: string; // 配置位置 ('center', 'top', 'bottom', etc.)
+			positionX?: string; // X軸位置 (例: '50%', '100px', '-50px')
+			positionY?: string; // Y軸位置 (例: '50%', '100px', '-50px')
+			size: string; // サイズ ('cover', 'contain', 'auto')
+			repeat: string; // リピート ('no-repeat', 'repeat', etc.)
+			rotation?: number; // 回転角度 (0-360度)
+		};
 	};
 	// 2カラムレイアウト用画像
 	images?: {
@@ -229,11 +237,19 @@ export interface TwoColumnTextImageSection extends BaseSection {
 	type: 'two_column_text_image';
 	content: {
 		textColumn: {
-			title: string;
+			title?: string;
 			subtitle?: string;
-			description: string;
+			description?: string;
 			buttonText?: string;
 			buttonLink?: string;
+			titleColor?: string;
+			subtitleColor?: string;
+			descriptionColor?: string;
+			titleBold?: boolean;
+			titleItalic?: boolean;
+			subtitleBold?: boolean;
+			subtitleItalic?: boolean;
+			fontFamily?: string;
 		};
 		imageColumn: {
 			imageUrl: string;
@@ -255,11 +271,19 @@ export interface TwoColumnImageTextSection extends BaseSection {
 			caption?: string;
 		};
 		textColumn: {
-			title: string;
+			title?: string;
 			subtitle?: string;
-			description: string;
+			description?: string;
 			buttonText?: string;
 			buttonLink?: string;
+			titleColor?: string;
+			subtitleColor?: string;
+			descriptionColor?: string;
+			titleBold?: boolean;
+			titleItalic?: boolean;
+			subtitleBold?: boolean;
+			subtitleItalic?: boolean;
+			fontFamily?: string;
 		};
 		layout: {
 			ratio: '50-50' | '60-40' | '40-60';
@@ -271,11 +295,19 @@ export interface TwoColumnTextVideoSection extends BaseSection {
 	type: 'two_column_text_video';
 	content: {
 		textColumn: {
-			title: string;
+			title?: string;
 			subtitle?: string;
-			description: string;
+			description?: string;
 			buttonText?: string;
 			buttonLink?: string;
+			titleColor?: string;
+			subtitleColor?: string;
+			descriptionColor?: string;
+			titleBold?: boolean;
+			titleItalic?: boolean;
+			subtitleBold?: boolean;
+			subtitleItalic?: boolean;
+			fontFamily?: string;
 		};
 		videoColumn: {
 			videoUrl: string;

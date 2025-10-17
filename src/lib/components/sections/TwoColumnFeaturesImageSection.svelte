@@ -14,7 +14,7 @@
 </script>
 
 <div class="py-16">
-	<div class="container mx-auto px-4">
+	<div class="max-w-4xl mx-auto px-4">
 		<div class="grid grid-cols-1 {gridClass} gap-8 items-center">
 			<!-- 特徴カラム -->
 			<div class="space-y-6">

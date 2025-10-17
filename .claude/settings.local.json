@@ -34,7 +34,10 @@
       "Bash(git commit:*)",
       "Bash(git branch:*)",
       "Bash(git remote add:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git config:*)",
+      "WebFetch(domain:sougoushinrimake-clnr-jv3esc44q-sougoushinris-projects.vercel.app)",
+      "Bash(npx supabase:*)"
     ],
     "deny": [],
     "ask": []

@@ -30,9 +30,13 @@
 		Settings,
 		Columns2,
 		Columns3,
-		Code
+		Code,
+		GripVertical
 	} from 'lucide-svelte';
 	import ImageUploader from '$lib/components/ImageUploader.svelte';
+	import ImagePicker from '$lib/components/ImagePicker.svelte';
+	import { dndzone } from 'svelte-dnd-action';
+	import { flip } from 'svelte/animate';
 
 	export let data: PageData;
 	export let form: ActionData;
@@ -50,13 +54,33 @@
 	// トグル状態を管理（セクションインデックスごと）
 	let expandedSections: Set<number> = new Set();
 	let expandedColorSettings: Set<number> = new Set(); // 色設定のトグル状態
+	let expandedBackgroundImageSettings: Set<number> = new Set(); // 背景画像設定のトグル状態
 	let aiChatExpanded = true; // AIチャットの折りたたみ状態
 	let columnLayout: '1-column' | '2-column' | '3-column' = '1-column'; // レイアウトタブ状態
+	let fullWidthPreview = false; // 全幅プレビューモード
+
+	// トースト通知
+	let toastMessage = '';
+	let toastType: 'success' | 'error' | 'info' = 'success';
+	let showToast = false;
+
+	function showNotification(message: string, type: 'success' | 'error' | 'info' = 'success') {
+		toastMessage = message;
+		toastType = type;
+		showToast = true;
+		setTimeout(() => {
+			showToast = false;
+		}, 3000);
+	}
 
 	// ソースコード編集用（セクション毎）
 	let sectionSourceCodes: string[] = [];
 	let sectionSourceErrors: Map<number, string> = new Map();
 	let expandedSourceSections: Set<number> = new Set();
+
+	// 画像ピッカー
+	let showImagePicker = false;
+	let currentImageTarget: { sectionIndex: number; field: string } | null = null;
 
 	// セクション毎のソースコードを初期化
 	$: sectionSourceCodes = sections.map(section =>
@@ -93,6 +117,15 @@
 		expandedColorSettings = expandedColorSettings;
 	}
 
+	function toggleBackgroundImageSettings(index: number) {
+		if (expandedBackgroundImageSettings.has(index)) {
+			expandedBackgroundImageSettings.delete(index);
+		} else {
+			expandedBackgroundImageSettings.add(index);
+		}
+		expandedBackgroundImageSettings = expandedBackgroundImageSettings;
+	}
+
 	// 個別セクション保存
 	async function saveSingleSection(index: number) {
 		saving = true;
@@ -107,7 +140,7 @@
 
 		saving = false;
 		if (response.ok) {
-			alert('セクションを保存しました');
+			showNotification('セクションを保存しました', 'success');
 		}
 	}
 
@@ -314,12 +347,7 @@
 				return {
 					title: 'ギャラリー',
 					subtitle: '私たちの作品をご覧ください',
-					images: [
-						{ url: 'https://via.placeholder.com/400x300', alt: '画像1', caption: '作品1' },
-						{ url: 'https://via.placeholder.com/400x300', alt: '画像2', caption: '作品2' },
-						{ url: 'https://via.placeholder.com/400x300', alt: '画像3', caption: '作品3' }
-					],
-					columns: 3
+					images: []
 				};
 			case 'video':
 				return {
@@ -352,7 +380,7 @@
 						buttonLink: '#'
 					},
 					imageColumn: {
-						imageUrl: 'https://via.placeholder.com/600x400',
+						imageUrl: '',
 						imageAlt: '画像の説明',
 						caption: ''
 					},
@@ -363,7 +391,7 @@
 			case 'two_column_image_text':
 				return {
 					imageColumn: {
-						imageUrl: 'https://via.placeholder.com/600x400',
+						imageUrl: '',
 						imageAlt: '画像の説明',
 						caption: ''
 					},
@@ -408,7 +436,7 @@
 						]
 					},
 					imageColumn: {
-						imageUrl: 'https://via.placeholder.com/600x400',
+						imageUrl: '',
 						imageAlt: '画像の説明',
 						caption: ''
 					},
@@ -435,7 +463,9 @@
 
 		saving = false;
 		if (response.ok) {
-			alert('保存しました');
+			showNotification('保存しました', 'success');
+		} else {
+			showNotification('保存に失敗しました', 'error');
 		}
 	}
 
@@ -475,11 +505,71 @@
 			// サーバーに保存
 			await saveContent();
 
-			alert(`セクション ${index + 1} を保存しました`);
+			showNotification(`セクション ${index + 1} を保存しました`, 'success');
 		} catch (e: any) {
 			sectionSourceErrors.set(index, `JSON解析エラー: ${e.message}`);
 			sectionSourceErrors = sectionSourceErrors;
 		}
+	}
+
+	// 画像選択モーダル
+	function openImagePicker(sectionIndex: number, field: string) {
+		currentImageTarget = { sectionIndex, field };
+		showImagePicker = true;
+	}
+
+	function handleImageSelect(url: string) {
+		if (!currentImageTarget) return;
+
+		const { sectionIndex, field } = currentImageTarget;
+		const section = sections[sectionIndex];
+
+		// 背景画像の場合は style.backgroundImage.url に設定
+		if (field === 'style.backgroundImage.url') {
+			if (!section.style) section.style = {};
+			if (!section.style.backgroundImage) {
+				section.style.backgroundImage = {
+					url: url,
+					opacity: 50,
+					positionX: '50%',
+					positionY: '50%',
+					size: 'cover',
+					repeat: 'no-repeat',
+					rotation: 0
+				};
+			} else {
+				section.style.backgroundImage.url = url;
+			}
+		} else {
+			// 通常のフィールドパス処理
+			const parts = field.split('.');
+			let target: any = section.content;
+
+			for (let i = 0; i < parts.length - 1; i++) {
+				target = target[parts[i]];
+			}
+
+			target[parts[parts.length - 1]] = url;
+		}
+
+		sections = sections;
+		showImagePicker = false;
+		currentImageTarget = null;
+	}
+
+	// ドラッグ&ドロップハンドラー
+	const flipDurationMs = 200;
+	function handleDndConsider(e: CustomEvent) {
+		sections = e.detail.items;
+	}
+
+	function handleDndFinalize(e: CustomEvent) {
+		sections = e.detail.items;
+		// orderプロパティを更新
+		sections = sections.map((section, index) => ({
+			...section,
+			order: index
+		}));
 	}
 
 	// テンプレート保存
@@ -496,7 +586,7 @@
 
 	async function saveAsTemplate() {
 		if (!templateName.trim()) {
-			alert('テンプレート名を入力してください');
+			showNotification('テンプレート名を入力してください', 'error');
 			return;
 		}
 
@@ -512,13 +602,13 @@
 
 		savingTemplate = false;
 		if (response.ok) {
-			alert('テンプレートとして保存しました');
+			showNotification('テンプレートとして保存しました', 'success');
 			showTemplateModal = false;
 			templateName = '';
 			templateDescription = '';
 		} else {
 			const result = await response.json();
-			alert(result.message || 'テンプレートの保存に失敗しました');
+			showNotification(result.message || 'テンプレートの保存に失敗しました', 'error');
 		}
 	}
 </script>
@@ -566,6 +656,21 @@
 						{saving ? '保存中...' : '保存'}
 					</button>
 
+					<!-- デバッグボタン（一時的） -->
+					<button
+						on:click={() => {
+							console.log('=== Current Sections Data ===');
+							console.log(JSON.stringify(sections, null, 2));
+							sections.forEach((section, index) => {
+								console.log(`\n=== Section ${index} (${section.type}) ===`);
+								console.log('Background Image:', section.style?.backgroundImage);
+							});
+						}}
+						class="px-4 py-2 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition text-sm"
+					>
+						デバッグ情報
+					</button>
+
 					<!-- プレビューボタン -->
 					{#if currentStatus === 'published'}
 						<a
@@ -591,6 +696,7 @@
 				<div class="space-y-4">
 					<div class="flex items-center justify-between">
 						<h2 class="text-lg font-semibold text-gray-800">セクション一覧</h2>
+						<p class="text-xs text-gray-500">ドラッグ&ドロップで並び替え</p>
 					</div>
 
 					{#if sections.length === 0}
@@ -599,21 +705,33 @@
 							<p>セクションがありません</p>
 							<p class="text-sm">AIアシスタントに「ヒーローセクションを追加して」のように指示してください</p>
 						</div>
-					{/if}
-
-					{#each sections as section, i}
-						<div class="bg-white border-2 border-gray-200 rounded-lg overflow-hidden">
-							<!-- セクションヘッダー -->
-							<button
-								on:click={() => toggleSection(i)}
-								class="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
-							>
-								<span class="font-semibold text-gray-800">{section.type}セクション</span>
-								<ChevronDown
-									size={20}
-									class="text-gray-400 transition-transform {expandedSections.has(i) ? 'rotate-180' : ''}"
-								/>
-							</button>
+					{:else}
+						<div
+							use:dndzone={{ items: sections, flipDurationMs, type: 'sections' }}
+							on:consider={handleDndConsider}
+							on:finalize={handleDndFinalize}
+							class="space-y-4"
+						>
+							{#each sections as section, i (section.id)}
+								<div animate:flip={{ duration: flipDurationMs }} class="bg-white border-2 border-gray-200 rounded-lg overflow-hidden">
+									<!-- セクションヘッダー -->
+									<div class="flex items-center">
+										<!-- ドラッグハンドル -->
+										<div class="px-2 py-3 cursor-grab active:cursor-grabbing hover:bg-gray-100 transition">
+											<GripVertical size={20} class="text-gray-400" />
+										</div>
+										<!-- セクションタイトルボタン -->
+										<button
+											on:click={() => toggleSection(i)}
+											class="flex-1 px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+										>
+											<span class="font-semibold text-gray-800">{section.type}セクション</span>
+											<ChevronDown
+												size={20}
+												class="text-gray-400 transition-transform {expandedSections.has(i) ? 'rotate-180' : ''}"
+											/>
+										</button>
+									</div>
 
 							<!-- セクション編集エリア（展開時のみ） -->
 							{#if expandedSections.has(i)}
@@ -742,6 +860,380 @@
 										{/if}
 									</div>
 
+									<!-- 背景画像設定 -->
+									<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+										<button
+											on:click={() => toggleBackgroundImageSettings(i)}
+											class="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+										>
+											<div class="flex items-center gap-2">
+												<ImageIcon size={18} class="text-blue-600" />
+												<h4 class="font-semibold text-sm">背景画像設定</h4>
+											</div>
+											<ChevronDown
+												size={16}
+												class="text-gray-400 transition-transform {expandedBackgroundImageSettings.has(i) ? 'rotate-180' : ''}"
+											/>
+										</button>
+
+										{#if expandedBackgroundImageSettings.has(i)}
+											<div class="border-t border-gray-200 p-4 space-y-3">
+												<!-- 画像URL -->
+												<div>
+													<label class="block text-xs font-medium text-gray-700 mb-2">背景画像</label>
+													<div class="flex gap-2">
+														<input
+															type="text"
+															value={section.style?.backgroundImage?.url || ''}
+															on:input={(e) => {
+																if (!section.style) section.style = {};
+																if (!section.style.backgroundImage) {
+																	section.style.backgroundImage = {
+																		url: e.target.value,
+																		opacity: 50,
+																		positionX: '50%',
+																		positionY: '50%',
+																		size: 'cover',
+																		repeat: 'no-repeat',
+																		rotation: 0
+																	};
+																} else {
+																	section.style.backgroundImage.url = e.target.value;
+																}
+																sections = sections;
+															}}
+															placeholder="https://..."
+															class="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
+														/>
+														<button
+															on:click={() => openImagePicker(i, 'style.backgroundImage.url')}
+															class="px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition whitespace-nowrap"
+														>
+															画像を選択
+														</button>
+													</div>
+													{#if section.style?.backgroundImage?.url}
+														<div class="mt-2">
+															<img
+																src={section.style.backgroundImage.url}
+																alt="背景画像プレビュー"
+																class="w-full h-24 object-cover rounded border border-gray-300"
+															/>
+														</div>
+													{/if}
+												</div>
+
+												<!-- 透過度 -->
+												<div>
+													<label class="block text-xs font-medium text-gray-700 mb-2">
+														透過度: {section.style?.backgroundImage?.opacity || 50}%
+													</label>
+													<input
+														type="range"
+														min="0"
+														max="100"
+														value={section.style?.backgroundImage?.opacity || 50}
+														on:input={(e) => {
+															if (!section.style) section.style = {};
+															if (!section.style.backgroundImage) {
+																section.style.backgroundImage = {
+																	url: '',
+																	opacity: parseInt(e.target.value),
+																	positionX: '50%',
+																	positionY: '50%',
+																	size: 'cover',
+																	repeat: 'no-repeat',
+																	rotation: 0
+																};
+															} else {
+																section.style.backgroundImage.opacity = parseInt(e.target.value);
+															}
+															sections = sections;
+														}}
+														class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+													/>
+													<div class="flex justify-between text-xs text-gray-500 mt-1">
+														<span>透明 (0%)</span>
+														<span>不透明 (100%)</span>
+													</div>
+												</div>
+
+												<!-- 画像サイズ -->
+												<div>
+													<label class="block text-xs font-medium text-gray-700 mb-2">
+														画像サイズ: {section.style?.backgroundImage?.size || '100%'}
+													</label>
+													<input
+														type="range"
+														min="10"
+														max="300"
+														value={parseInt((section.style?.backgroundImage?.size || '100%').replace('%', ''))}
+														on:input={(e) => {
+															const value = `${e.target.value}%`;
+															if (!section.style) section.style = {};
+															if (!section.style.backgroundImage) {
+																section.style.backgroundImage = {
+																	url: '',
+																	opacity: 50,
+																	positionX: '50%',
+																	positionY: '50%',
+																	size: value,
+																	repeat: 'no-repeat',
+																	rotation: 0
+																};
+															} else {
+																section.style.backgroundImage.size = value;
+															}
+															sections = sections;
+														}}
+														class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+													/>
+													<div class="flex justify-between text-xs text-gray-500 mt-1">
+														<span>縮小 (10%)</span>
+														<span>等倍 (100%)</span>
+														<span>拡大 (300%)</span>
+													</div>
+												</div>
+
+												<!-- 画像リピート -->
+												<div>
+													<label class="block text-xs font-medium text-gray-700 mb-2">画像の繰り返し</label>
+													<select
+														value={section.style?.backgroundImage?.repeat || 'no-repeat'}
+														on:change={(e) => {
+															if (!section.style) section.style = {};
+															if (!section.style.backgroundImage) {
+																section.style.backgroundImage = {
+																	url: '',
+																	opacity: 50,
+																	positionX: '50%',
+																	positionY: '50%',
+																	size: 'cover',
+																	repeat: e.target.value,
+																	rotation: 0
+																};
+															} else {
+																section.style.backgroundImage.repeat = e.target.value;
+															}
+															sections = sections;
+														}}
+														class="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+													>
+														<option value="no-repeat">繰り返しなし</option>
+														<option value="repeat">両方向に繰り返し</option>
+														<option value="repeat-x">横方向のみ繰り返し</option>
+														<option value="repeat-y">縦方向のみ繰り返し</option>
+													</select>
+												</div>
+
+												<!-- 詳細位置調整（X軸・Y軸） -->
+												<div class="border-t border-gray-200 pt-3">
+													<label class="block text-xs font-medium text-gray-700 mb-2">詳細位置調整</label>
+
+													<!-- X軸位置 -->
+													<div class="mb-3">
+														<label class="block text-xs text-gray-600 mb-2">
+															X軸位置: {section.style?.backgroundImage?.positionX || '50%'}
+														</label>
+														<input
+															type="range"
+															min="-100"
+															max="200"
+															value={parseInt((section.style?.backgroundImage?.positionX || '50%').replace('%', ''))}
+															on:input={(e) => {
+																const value = `${e.target.value}%`;
+																if (!section.style) section.style = {};
+																if (!section.style.backgroundImage) {
+																	section.style.backgroundImage = {
+																		url: '',
+																		opacity: 50,
+																		positionX: value,
+																		positionY: '50%',
+																		size: 'cover',
+																		repeat: 'no-repeat',
+																		rotation: 0
+																	};
+																} else {
+																	section.style.backgroundImage.positionX = value;
+																}
+																sections = sections;
+															}}
+															class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+														/>
+														<div class="flex justify-between text-xs text-gray-500 mt-1">
+															<span>左端外 (-100%)</span>
+															<span>中央 (50%)</span>
+															<span>右端外 (200%)</span>
+														</div>
+													</div>
+
+													<!-- Y軸位置 -->
+													<div class="mb-3">
+														<label class="block text-xs text-gray-600 mb-2">
+															Y軸位置: {section.style?.backgroundImage?.positionY || '50%'}
+														</label>
+														<input
+															type="range"
+															min="-100"
+															max="200"
+															value={parseInt((section.style?.backgroundImage?.positionY || '50%').replace('%', ''))}
+															on:input={(e) => {
+																const value = `${e.target.value}%`;
+																if (!section.style) section.style = {};
+																if (!section.style.backgroundImage) {
+																	section.style.backgroundImage = {
+																		url: '',
+																		opacity: 50,
+																		positionX: '50%',
+																		positionY: value,
+																		size: 'cover',
+																		repeat: 'no-repeat',
+																		rotation: 0
+																	};
+																} else {
+																	section.style.backgroundImage.positionY = value;
+																}
+																sections = sections;
+															}}
+															class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+														/>
+														<div class="flex justify-between text-xs text-gray-500 mt-1">
+															<span>上端外 (-100%)</span>
+															<span>中央 (50%)</span>
+															<span>下端外 (200%)</span>
+														</div>
+													</div>
+
+													<!-- 手動入力（細かい調整用） -->
+													<details class="mt-2">
+														<summary class="text-xs text-blue-600 cursor-pointer hover:text-blue-800">手動で入力（詳細調整）</summary>
+														<div class="grid grid-cols-2 gap-2 mt-2">
+															<div>
+																<label class="block text-xs text-gray-600 mb-1">X軸（カスタム）</label>
+																<input
+																	type="text"
+																	value={section.style?.backgroundImage?.positionX || '50%'}
+																	on:input={(e) => {
+																		if (!section.style) section.style = {};
+																		if (!section.style.backgroundImage) {
+																			section.style.backgroundImage = {
+																				url: '',
+																				opacity: 50,
+																				positionX: e.target.value,
+																				positionY: '50%',
+																				size: 'cover',
+																				repeat: 'no-repeat',
+																				rotation: 0
+																			};
+																		} else {
+																			section.style.backgroundImage.positionX = e.target.value;
+																		}
+																		sections = sections;
+																	}}
+																	placeholder="50%, 100px, -20px"
+																	class="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+																/>
+															</div>
+															<div>
+																<label class="block text-xs text-gray-600 mb-1">Y軸（カスタム）</label>
+																<input
+																	type="text"
+																	value={section.style?.backgroundImage?.positionY || '50%'}
+																	on:input={(e) => {
+																		if (!section.style) section.style = {};
+																		if (!section.style.backgroundImage) {
+																			section.style.backgroundImage = {
+																				url: '',
+																				opacity: 50,
+																				positionX: '50%',
+																				positionY: e.target.value,
+																				size: 'cover',
+																				repeat: 'no-repeat',
+																				rotation: 0
+																			};
+																		} else {
+																			section.style.backgroundImage.positionY = e.target.value;
+																		}
+																		sections = sections;
+																	}}
+																	placeholder="50%, 100px, -20px"
+																	class="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+																/>
+															</div>
+														</div>
+													</details>
+												</div>
+
+												<!-- 向きの角度 -->
+												<div class="border-t border-gray-200 pt-3">
+													<label class="block text-xs font-medium text-gray-700 mb-2">
+														向きの角度: {section.style?.backgroundImage?.rotation || 0}°
+													</label>
+													<input
+														type="range"
+														min="-180"
+														max="180"
+														value={section.style?.backgroundImage?.rotation || 0}
+														on:input={(e) => {
+															if (!section.style) section.style = {};
+															if (!section.style.backgroundImage) {
+																section.style.backgroundImage = {
+																	url: '',
+																	opacity: 50,
+																	positionX: '50%',
+																	positionY: '50%',
+																	size: '100%',
+																	repeat: 'no-repeat',
+																	rotation: parseInt(e.target.value)
+																};
+															} else {
+																section.style.backgroundImage.rotation = parseInt(e.target.value);
+															}
+															sections = sections;
+														}}
+														class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+													/>
+													<div class="flex justify-between text-xs text-gray-500 mt-1">
+														<span>-180° (左)</span>
+														<span>-90° (左向き)</span>
+														<span>0° (通常)</span>
+														<span>90° (右向き)</span>
+														<span>180° (右)</span>
+													</div>
+												</div>
+
+												<!-- 背景画像設定リセットボタン -->
+												{#if section.style?.backgroundImage}
+													<button
+														on:click={() => {
+															if (section.style && section.style.backgroundImage) {
+																section.style.backgroundImage = {
+																	url: '',
+																	opacity: 50,
+																	positionX: '50%',
+																	positionY: '50%',
+																	size: '100%',
+																	repeat: 'no-repeat',
+																	rotation: 0
+																};
+																sections = sections;
+															}
+														}}
+														class="w-full px-3 py-2 bg-gray-50 text-gray-700 border border-gray-300 rounded text-sm hover:bg-gray-100 transition flex items-center justify-center gap-2"
+													>
+														<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+															<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+															<path d="M21 3v5h-5"/>
+															<path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+															<path d="M8 16H3v5"/>
+														</svg>
+														すべての設定をリセット
+													</button>
+												{/if}
+											</div>
+										{/if}
+									</div>
+
 									<!-- コンテンツ編集（セクションタイプ別） -->
 									<div class="bg-white rounded-lg p-4 space-y-3 border border-gray-200">
 										<div class="flex items-center gap-2 mb-2">
@@ -777,20 +1269,42 @@
 													></textarea>
 												</div>
 												<div>
-													<label class="block text-xs font-medium text-gray-700 mb-1">ボタンテキスト</label>
-													<input
-														type="text"
-														bind:value={section.content.buttonText}
-														class="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-													/>
-												</div>
-												<div>
-													<label class="block text-xs font-medium text-gray-700 mb-1">ボタンリンク</label>
-													<input
-														type="text"
-														bind:value={section.content.buttonLink}
-														class="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-													/>
+													<label class="block text-xs font-medium text-gray-700 mb-2">ボタン設定</label>
+													{#if section.content.buttonText !== undefined || section.content.buttonLink !== undefined}
+														<input
+															type="text"
+															bind:value={section.content.buttonText}
+															placeholder="ボタンテキスト"
+															class="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+														/>
+														<input
+															type="text"
+															bind:value={section.content.buttonLink}
+															placeholder="ボタンリンク (例: #, /contact)"
+															class="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+														/>
+														<button
+															on:click={() => {
+																section.content.buttonText = undefined;
+																section.content.buttonLink = undefined;
+																sections = sections;
+															}}
+															class="w-full px-3 py-2 bg-red-50 text-red-600 border border-red-300 rounded text-sm font-semibold hover:bg-red-100 transition"
+														>
+															ボタンを削除
+														</button>
+													{:else}
+														<button
+															on:click={() => {
+																section.content.buttonText = 'ボタン';
+																section.content.buttonLink = '#';
+																sections = sections;
+															}}
+															class="w-full px-3 py-2 bg-green-50 text-green-600 border border-green-300 rounded text-sm font-semibold hover:bg-green-100 transition"
+														>
+															+ ボタンを追加
+														</button>
+													{/if}
 												</div>
 											</div>
 										{/if}
@@ -860,20 +1374,42 @@
 													></textarea>
 												</div>
 												<div>
-													<label class="block text-xs font-medium text-gray-700 mb-1">ボタンテキスト</label>
-													<input
-														type="text"
-														bind:value={section.content.buttonText}
-														class="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-													/>
-												</div>
-												<div>
-													<label class="block text-xs font-medium text-gray-700 mb-1">ボタンリンク</label>
-													<input
-														type="text"
-														bind:value={section.content.buttonLink}
-														class="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-													/>
+													<label class="block text-xs font-medium text-gray-700 mb-2">ボタン設定</label>
+													{#if section.content.buttonText !== undefined || section.content.buttonLink !== undefined}
+														<input
+															type="text"
+															bind:value={section.content.buttonText}
+															placeholder="ボタンテキスト"
+															class="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+														/>
+														<input
+															type="text"
+															bind:value={section.content.buttonLink}
+															placeholder="ボタンリンク (例: #, /contact)"
+															class="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+														/>
+														<button
+															on:click={() => {
+																section.content.buttonText = undefined;
+																section.content.buttonLink = undefined;
+																sections = sections;
+															}}
+															class="w-full px-3 py-2 bg-red-50 text-red-600 border border-red-300 rounded text-sm font-semibold hover:bg-red-100 transition"
+														>
+															ボタンを削除
+														</button>
+													{:else}
+														<button
+															on:click={() => {
+																section.content.buttonText = 'ボタン';
+																section.content.buttonLink = '#';
+																sections = sections;
+															}}
+															class="w-full px-3 py-2 bg-green-50 text-green-600 border border-green-300 rounded text-sm font-semibold hover:bg-green-100 transition"
+														>
+															+ ボタンを追加
+														</button>
+													{/if}
 												</div>
 											</div>
 										{/if}
@@ -900,53 +1436,399 @@
 											</div>
 										{/if}
 
+										<!-- Gallery Section -->
+										{#if section.type === 'gallery'}
+											<div class="space-y-3">
+												<div>
+													<label class="block text-xs font-medium text-gray-700 mb-1">タイトル</label>
+													<input
+														type="text"
+														bind:value={section.content.title}
+														class="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+													/>
+												</div>
+												<div>
+													<label class="block text-xs font-medium text-gray-700 mb-1">サブタイトル</label>
+													<input
+														type="text"
+														bind:value={section.content.subtitle}
+														class="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+													/>
+												</div>
+												<div>
+													<label class="block text-xs font-medium text-gray-700 mb-2">画像一覧</label>
+													<p class="text-xs text-gray-500 mb-2">画像はレスポンシブ対応で表示されます（モバイル: 1列、タブレット: 2列、デスクトップ: 3列）</p>
+													{#if !section.content.images}
+														{section.content.images = []}
+													{/if}
+													{#each section.content.images as image, idx}
+														<div class="mb-3 p-3 bg-gray-50 rounded border border-gray-200">
+															<div class="flex items-center justify-between mb-2">
+																<span class="text-xs font-semibold text-gray-700">画像 {idx + 1}</span>
+																<button
+																	on:click={() => {
+																		section.content.images = section.content.images.filter((_, j) => j !== idx);
+																		sections = sections;
+																	}}
+																	class="px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
+																>
+																	削除
+																</button>
+															</div>
+															<div class="space-y-2">
+																<div>
+																	<label class="block text-xs font-medium text-gray-600 mb-1">画像URL</label>
+																	<div class="flex gap-2">
+																		<input
+																			type="text"
+																			bind:value={image.url}
+																			class="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+																			placeholder="https://..."
+																		/>
+																		<button
+																			on:click={() => openImagePicker(i, `images.${idx}.url`)}
+																			class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition whitespace-nowrap"
+																		>
+																			選択
+																		</button>
+																	</div>
+																</div>
+																<div>
+																	<label class="block text-xs font-medium text-gray-600 mb-1">Alt テキスト</label>
+																	<input
+																		type="text"
+																		bind:value={image.alt}
+																		class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+																	/>
+																</div>
+																<div>
+																	<label class="block text-xs font-medium text-gray-600 mb-1">キャプション（任意）</label>
+																	<input
+																		type="text"
+																		bind:value={image.caption}
+																		class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+																	/>
+																</div>
+															</div>
+														</div>
+													{/each}
+													<button
+														on:click={() => {
+															if (!section.content.images) section.content.images = [];
+															section.content.images = [...section.content.images, { url: '', alt: '', caption: '' }];
+															sections = sections;
+														}}
+														class="w-full px-3 py-2 bg-blue-50 text-blue-600 border border-blue-300 rounded text-sm hover:bg-blue-100 transition"
+													>
+														+ 画像を追加
+													</button>
+												</div>
+											</div>
+										{/if}
+
 										<!-- Two Column Text + Image Section -->
 										{#if section.type === 'two_column_text_image'}
 											<div class="space-y-4">
 												<!-- テキストカラム -->
 												<div class="p-3 bg-gray-50 rounded border border-gray-200">
-													<h5 class="text-xs font-semibold text-gray-700 mb-2">テキストカラム</h5>
-													<div class="space-y-2">
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">タイトル</label>
-															<input
-																type="text"
-																bind:value={section.content.textColumn.title}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															/>
+													<div class="flex items-center justify-between mb-3">
+														<h5 class="text-xs font-semibold text-gray-700">テキストカラム</h5>
+														<button
+															on:click={() => {
+																section.content.textColumn = {
+																	title: '',
+																	subtitle: '',
+																	description: '',
+																	buttonText: undefined,
+																	buttonLink: undefined
+																};
+																sections = sections;
+															}}
+															class="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+														>
+															リセット
+														</button>
+													</div>
+
+													<div class="space-y-3">
+														<!-- タイトル -->
+														<div class="p-2 border rounded-lg bg-white">
+															{#if section.content.textColumn.title !== undefined}
+																<div class="flex items-center justify-between mb-2">
+																	<span class="text-xs font-semibold text-gray-700">タイトル</span>
+																	<button
+																		on:click={() => {
+																			delete section.content.textColumn.title;
+																			delete section.content.textColumn.titleColor;
+																			delete section.content.textColumn.titleBold;
+																			delete section.content.textColumn.titleItalic;
+																			sections = sections;
+																		}}
+																		class="text-xs text-red-600 hover:text-red-800"
+																	>
+																		削除
+																	</button>
+																</div>
+																<input
+																	type="text"
+																	bind:value={section.content.textColumn.title}
+																	placeholder="タイトル"
+																	class="w-full px-2 py-1 border rounded text-sm mb-2"
+																/>
+																<div class="flex gap-2 items-center">
+																	<label class="flex items-center gap-1 text-xs">
+																		<input
+																			type="checkbox"
+																			bind:checked={section.content.textColumn.titleBold}
+																			class="rounded"
+																		/>
+																		<span class="font-bold">B</span>
+																	</label>
+																	<label class="flex items-center gap-1 text-xs">
+																		<input
+																			type="checkbox"
+																			bind:checked={section.content.textColumn.titleItalic}
+																			class="rounded"
+																		/>
+																		<span class="italic">I</span>
+																	</label>
+																	<div class="flex items-center gap-2 ml-auto">
+																		<input
+																			type="color"
+																			bind:value={section.content.textColumn.titleColor}
+																			class="w-6 h-6 rounded cursor-pointer"
+																		/>
+																		<input
+																			type="text"
+																			bind:value={section.content.textColumn.titleColor}
+																			placeholder="#000000"
+																			class="w-20 px-1 py-1 border rounded text-xs"
+																		/>
+																	</div>
+																</div>
+															{:else}
+																<button
+																	on:click={() => {
+																		section.content.textColumn.title = '';
+																		sections = sections;
+																	}}
+																	class="w-full px-2 py-1 border-2 border-dashed border-gray-300 rounded text-xs text-gray-500 hover:border-blue-500 hover:text-blue-500 transition"
+																>
+																	+ タイトルを追加
+																</button>
+															{/if}
 														</div>
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">サブタイトル</label>
-															<input
-																type="text"
-																bind:value={section.content.textColumn.subtitle}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															/>
+
+														<!-- サブタイトル -->
+														<div class="p-2 border rounded-lg bg-white">
+															{#if section.content.textColumn.subtitle !== undefined}
+																<div class="flex items-center justify-between mb-2">
+																	<span class="text-xs font-semibold text-gray-700">サブタイトル</span>
+																	<button
+																		on:click={() => {
+																			delete section.content.textColumn.subtitle;
+																			delete section.content.textColumn.subtitleColor;
+																			delete section.content.textColumn.subtitleBold;
+																			delete section.content.textColumn.subtitleItalic;
+																			sections = sections;
+																		}}
+																		class="text-xs text-red-600 hover:text-red-800"
+																	>
+																		削除
+																	</button>
+																</div>
+																<input
+																	type="text"
+																	bind:value={section.content.textColumn.subtitle}
+																	placeholder="サブタイトル"
+																	class="w-full px-2 py-1 border rounded text-sm mb-2"
+																/>
+																<div class="flex gap-2 items-center">
+																	<label class="flex items-center gap-1 text-xs">
+																		<input
+																			type="checkbox"
+																			bind:checked={section.content.textColumn.subtitleBold}
+																			class="rounded"
+																		/>
+																		<span class="font-bold">B</span>
+																	</label>
+																	<label class="flex items-center gap-1 text-xs">
+																		<input
+																			type="checkbox"
+																			bind:checked={section.content.textColumn.subtitleItalic}
+																			class="rounded"
+																		/>
+																		<span class="italic">I</span>
+																	</label>
+																	<div class="flex items-center gap-2 ml-auto">
+																		<input
+																			type="color"
+																			bind:value={section.content.textColumn.subtitleColor}
+																			class="w-6 h-6 rounded cursor-pointer"
+																		/>
+																		<input
+																			type="text"
+																			bind:value={section.content.textColumn.subtitleColor}
+																			placeholder="#000000"
+																			class="w-20 px-1 py-1 border rounded text-xs"
+																		/>
+																	</div>
+																</div>
+															{:else}
+																<button
+																	on:click={() => {
+																		section.content.textColumn.subtitle = '';
+																		sections = sections;
+																	}}
+																	class="w-full px-2 py-1 border-2 border-dashed border-gray-300 rounded text-xs text-gray-500 hover:border-blue-500 hover:text-blue-500 transition"
+																>
+																	+ サブタイトルを追加
+																</button>
+															{/if}
 														</div>
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">説明文</label>
-															<textarea
-																bind:value={section.content.textColumn.description}
-																rows="3"
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															></textarea>
+
+														<!-- 説明 -->
+														<div class="p-2 border rounded-lg bg-white">
+															{#if section.content.textColumn.description !== undefined}
+																<div class="flex items-center justify-between mb-2">
+																	<span class="text-xs font-semibold text-gray-700">説明</span>
+																	<button
+																		on:click={() => {
+																			delete section.content.textColumn.description;
+																			delete section.content.textColumn.descriptionColor;
+																			sections = sections;
+																		}}
+																		class="text-xs text-red-600 hover:text-red-800"
+																	>
+																		削除
+																	</button>
+																</div>
+																<textarea
+																	bind:value={section.content.textColumn.description}
+																	placeholder="説明"
+																	class="w-full px-2 py-1 border rounded text-sm mb-2"
+																	rows="3"
+																></textarea>
+																<div class="flex items-center gap-2">
+																	<input
+																		type="color"
+																		bind:value={section.content.textColumn.descriptionColor}
+																		class="w-6 h-6 rounded cursor-pointer"
+																	/>
+																	<input
+																		type="text"
+																		bind:value={section.content.textColumn.descriptionColor}
+																		placeholder="#000000"
+																		class="w-20 px-1 py-1 border rounded text-xs"
+																	/>
+																</div>
+															{:else}
+																<button
+																	on:click={() => {
+																		section.content.textColumn.description = '';
+																		sections = sections;
+																	}}
+																	class="w-full px-2 py-1 border-2 border-dashed border-gray-300 rounded text-xs text-gray-500 hover:border-blue-500 hover:text-blue-500 transition"
+																>
+																	+ 説明を追加
+																</button>
+															{/if}
 														</div>
+
+													</div>
+												</div>
+
+												<!-- ボタン設定 -->
+												<div class="p-3 bg-gray-50 rounded border border-gray-200">
+													<button
+														on:click={() => {
+															const btn = document.getElementById('button-settings-' + section.id);
+															if (btn) btn.classList.toggle('hidden');
+														}}
+														class="w-full flex items-center justify-between text-left"
+													>
+														<h5 class="text-xs font-semibold text-gray-700">🔘 ボタン設定</h5>
+														<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500"><polyline points="6 9 12 15 18 9"></polyline></svg>
+													</button>
+													<div id="button-settings-{section.id}" class="mt-3 space-y-2">
+														{#if section.content.textColumn.buttonText !== undefined || section.content.textColumn.buttonLink !== undefined}
+															<div class="space-y-2">
+																<div>
+																	<label class="block text-xs font-medium text-gray-600 mb-1">ボタンテキスト</label>
+																	<input
+																		type="text"
+																		bind:value={section.content.textColumn.buttonText}
+																		placeholder="ボタンテキスト"
+																		class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+																	/>
+																</div>
+																<div>
+																	<label class="block text-xs font-medium text-gray-600 mb-1">ボタンリンク</label>
+																	<input
+																		type="text"
+																		bind:value={section.content.textColumn.buttonLink}
+																		placeholder="ボタンリンク (例: #, /contact)"
+																		class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+																	/>
+																</div>
+																<button
+																	on:click={() => {
+																		section.content.textColumn.buttonText = undefined;
+																		section.content.textColumn.buttonLink = undefined;
+																		sections = sections;
+																	}}
+																	class="w-full px-2 py-1 bg-red-50 text-red-600 border border-red-300 rounded text-sm font-semibold hover:bg-red-100 transition"
+																>
+																	ボタンを削除
+																</button>
+															</div>
+														{:else}
+															<button
+																on:click={() => {
+																	section.content.textColumn.buttonText = 'ボタン';
+																	section.content.textColumn.buttonLink = '#';
+																	sections = sections;
+																}}
+																class="w-full px-2 py-1 bg-green-50 text-green-600 border border-green-300 rounded text-sm font-semibold hover:bg-green-100 transition"
+															>
+																+ ボタンを追加
+															</button>
+														{/if}
+													</div>
+												</div>
+
+												<!-- フォント設定 -->
+												<div class="p-3 bg-gray-50 rounded border border-gray-200">
+													<button
+														on:click={() => {
+															const fontSettings = document.getElementById('font-settings-' + section.id);
+															if (fontSettings) fontSettings.classList.toggle('hidden');
+														}}
+														class="w-full flex items-center justify-between text-left"
+													>
+														<h5 class="text-xs font-semibold text-gray-700">🔤 フォント設定</h5>
+														<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500"><polyline points="6 9 12 15 18 9"></polyline></svg>
+													</button>
+													<div id="font-settings-{section.id}" class="mt-3 space-y-2 hidden">
 														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">ボタンテキスト</label>
-															<input
-																type="text"
-																bind:value={section.content.textColumn.buttonText}
+															<label class="block text-xs font-medium text-gray-600 mb-1">フォントファミリー</label>
+															<select
+																bind:value={section.content.textColumn.fontFamily}
 																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															/>
+															>
+																<option value="">デフォルト</option>
+																<option value="'Noto Sans JP', sans-serif">Noto Sans JP（ゴシック体）</option>
+																<option value="'Noto Serif JP', serif">Noto Serif JP（明朝体）</option>
+																<option value="'M PLUS Rounded 1c', sans-serif">M PLUS Rounded 1c（丸ゴシック）</option>
+																<option value="'Zen Kaku Gothic New', sans-serif">Zen Kaku Gothic New（角ゴシック）</option>
+																<option value="'Shippori Mincho', serif">Shippori Mincho（明朝体）</option>
+																<option value="Arial, sans-serif">Arial</option>
+																<option value="'Times New Roman', serif">Times New Roman</option>
+																<option value="Georgia, serif">Georgia</option>
+																<option value="'Courier New', monospace">Courier New（等幅）</option>
+															</select>
 														</div>
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">ボタンリンク</label>
-															<input
-																type="text"
-																bind:value={section.content.textColumn.buttonLink}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															/>
-														</div>
+														<p class="text-xs text-gray-500">※ セクション全体のフォントが変更されます</p>
 													</div>
 												</div>
 
@@ -956,12 +1838,20 @@
 													<div class="space-y-2">
 														<div>
 															<label class="block text-xs font-medium text-gray-600 mb-1">画像URL</label>
-															<input
-																type="text"
-																bind:value={section.content.imageColumn.imageUrl}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-																placeholder="https://..."
-															/>
+															<div class="flex gap-2">
+																<input
+																	type="text"
+																	bind:value={section.content.imageColumn.imageUrl}
+																	class="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+																	placeholder="https://..."
+																/>
+																<button
+																	on:click={() => openImagePicker(i, 'imageColumn.imageUrl')}
+																	class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition whitespace-nowrap"
+																>
+																	画像を選択
+																</button>
+															</div>
 														</div>
 														<div>
 															<label class="block text-xs font-medium text-gray-600 mb-1">画像の説明（Alt）</label>
@@ -998,12 +1888,20 @@
 													<div class="space-y-2">
 														<div>
 															<label class="block text-xs font-medium text-gray-600 mb-1">画像URL</label>
-															<input
-																type="text"
-																bind:value={section.content.imageColumn.imageUrl}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-																placeholder="https://..."
-															/>
+															<div class="flex gap-2">
+																<input
+																	type="text"
+																	bind:value={section.content.imageColumn.imageUrl}
+																	class="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+																	placeholder="https://..."
+																/>
+																<button
+																	on:click={() => openImagePicker(i, 'imageColumn.imageUrl')}
+																	class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition whitespace-nowrap"
+																>
+																	画像を選択
+																</button>
+															</div>
 														</div>
 														<div>
 															<label class="block text-xs font-medium text-gray-600 mb-1">画像の説明（Alt）</label>
@@ -1018,48 +1916,269 @@
 
 												<!-- テキストカラム -->
 												<div class="p-3 bg-gray-50 rounded border border-gray-200">
-													<h5 class="text-xs font-semibold text-gray-700 mb-2">テキストカラム</h5>
-													<div class="space-y-2">
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">タイトル</label>
-															<input
-																type="text"
-																bind:value={section.content.textColumn.title}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															/>
+													<div class="flex items-center justify-between mb-3">
+														<h5 class="text-xs font-semibold text-gray-700">テキストカラム</h5>
+														<button
+															on:click={() => {
+																section.content.textColumn = {
+																	title: '',
+																	subtitle: '',
+																	description: '',
+																	buttonText: undefined,
+																	buttonLink: undefined
+																};
+																sections = sections;
+															}}
+															class="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+														>
+															リセット
+														</button>
+													</div>
+
+													<div class="space-y-3">
+														<!-- タイトル -->
+														<div class="p-2 border rounded-lg bg-white">
+															{#if section.content.textColumn.title !== undefined}
+																<div class="flex items-center justify-between mb-2">
+																	<span class="text-xs font-semibold text-gray-700">タイトル</span>
+																	<button
+																		on:click={() => {
+																			delete section.content.textColumn.title;
+																			delete section.content.textColumn.titleColor;
+																			delete section.content.textColumn.titleBold;
+																			delete section.content.textColumn.titleItalic;
+																			sections = sections;
+																		}}
+																		class="text-xs text-red-600 hover:text-red-800"
+																	>
+																		削除
+																	</button>
+																</div>
+																<input
+																	type="text"
+																	bind:value={section.content.textColumn.title}
+																	placeholder="タイトル"
+																	class="w-full px-2 py-1 border rounded text-sm mb-2"
+																/>
+																<div class="flex gap-2 items-center">
+																	<label class="flex items-center gap-1 text-xs">
+																		<input
+																			type="checkbox"
+																			bind:checked={section.content.textColumn.titleBold}
+																			class="rounded"
+																		/>
+																		<span class="font-bold">B</span>
+																	</label>
+																	<label class="flex items-center gap-1 text-xs">
+																		<input
+																			type="checkbox"
+																			bind:checked={section.content.textColumn.titleItalic}
+																			class="rounded"
+																		/>
+																		<span class="italic">I</span>
+																	</label>
+																	<div class="flex items-center gap-2 ml-auto">
+																		<input
+																			type="color"
+																			bind:value={section.content.textColumn.titleColor}
+																			class="w-6 h-6 rounded cursor-pointer"
+																		/>
+																		<input
+																			type="text"
+																			bind:value={section.content.textColumn.titleColor}
+																			placeholder="#000000"
+																			class="w-20 px-1 py-1 border rounded text-xs"
+																		/>
+																	</div>
+																</div>
+															{:else}
+																<button
+																	on:click={() => {
+																		section.content.textColumn.title = '';
+																		sections = sections;
+																	}}
+																	class="w-full px-2 py-1 border-2 border-dashed border-gray-300 rounded text-xs text-gray-500 hover:border-blue-500 hover:text-blue-500 transition"
+																>
+																	+ タイトルを追加
+																</button>
+															{/if}
 														</div>
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">サブタイトル</label>
-															<input
-																type="text"
-																bind:value={section.content.textColumn.subtitle}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															/>
+
+														<!-- サブタイトル -->
+														<div class="p-2 border rounded-lg bg-white">
+															{#if section.content.textColumn.subtitle !== undefined}
+																<div class="flex items-center justify-between mb-2">
+																	<span class="text-xs font-semibold text-gray-700">サブタイトル</span>
+																	<button
+																		on:click={() => {
+																			delete section.content.textColumn.subtitle;
+																			delete section.content.textColumn.subtitleColor;
+																			delete section.content.textColumn.subtitleBold;
+																			delete section.content.textColumn.subtitleItalic;
+																			sections = sections;
+																		}}
+																		class="text-xs text-red-600 hover:text-red-800"
+																	>
+																		削除
+																	</button>
+																</div>
+																<input
+																	type="text"
+																	bind:value={section.content.textColumn.subtitle}
+																	placeholder="サブタイトル"
+																	class="w-full px-2 py-1 border rounded text-sm mb-2"
+																/>
+																<div class="flex gap-2 items-center">
+																	<label class="flex items-center gap-1 text-xs">
+																		<input
+																			type="checkbox"
+																			bind:checked={section.content.textColumn.subtitleBold}
+																			class="rounded"
+																		/>
+																		<span class="font-bold">B</span>
+																	</label>
+																	<label class="flex items-center gap-1 text-xs">
+																		<input
+																			type="checkbox"
+																			bind:checked={section.content.textColumn.subtitleItalic}
+																			class="rounded"
+																		/>
+																		<span class="italic">I</span>
+																	</label>
+																	<div class="flex items-center gap-2 ml-auto">
+																		<input
+																			type="color"
+																			bind:value={section.content.textColumn.subtitleColor}
+																			class="w-6 h-6 rounded cursor-pointer"
+																		/>
+																		<input
+																			type="text"
+																			bind:value={section.content.textColumn.subtitleColor}
+																			placeholder="#000000"
+																			class="w-20 px-1 py-1 border rounded text-xs"
+																		/>
+																	</div>
+																</div>
+															{:else}
+																<button
+																	on:click={() => {
+																		section.content.textColumn.subtitle = '';
+																		sections = sections;
+																	}}
+																	class="w-full px-2 py-1 border-2 border-dashed border-gray-300 rounded text-xs text-gray-500 hover:border-blue-500 hover:text-blue-500 transition"
+																>
+																	+ サブタイトルを追加
+																</button>
+															{/if}
 														</div>
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">説明文</label>
-															<textarea
-																bind:value={section.content.textColumn.description}
-																rows="3"
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															></textarea>
+
+														<!-- 説明 -->
+														<div class="p-2 border rounded-lg bg-white">
+															{#if section.content.textColumn.description !== undefined}
+																<div class="flex items-center justify-between mb-2">
+																	<span class="text-xs font-semibold text-gray-700">説明</span>
+																	<button
+																		on:click={() => {
+																			delete section.content.textColumn.description;
+																			delete section.content.textColumn.descriptionColor;
+																			sections = sections;
+																		}}
+																		class="text-xs text-red-600 hover:text-red-800"
+																	>
+																		削除
+																	</button>
+																</div>
+																<textarea
+																	bind:value={section.content.textColumn.description}
+																	placeholder="説明"
+																	class="w-full px-2 py-1 border rounded text-sm mb-2"
+																	rows="3"
+																></textarea>
+																<div class="flex items-center gap-2">
+																	<input
+																		type="color"
+																		bind:value={section.content.textColumn.descriptionColor}
+																		class="w-6 h-6 rounded cursor-pointer"
+																	/>
+																	<input
+																		type="text"
+																		bind:value={section.content.textColumn.descriptionColor}
+																		placeholder="#000000"
+																		class="w-20 px-1 py-1 border rounded text-xs"
+																	/>
+																</div>
+															{:else}
+																<button
+																	on:click={() => {
+																		section.content.textColumn.description = '';
+																		sections = sections;
+																	}}
+																	class="w-full px-2 py-1 border-2 border-dashed border-gray-300 rounded text-xs text-gray-500 hover:border-blue-500 hover:text-blue-500 transition"
+																>
+																	+ 説明を追加
+																</button>
+															{/if}
 														</div>
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">ボタンテキスト</label>
-															<input
-																type="text"
-																bind:value={section.content.textColumn.buttonText}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															/>
-														</div>
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">ボタンリンク</label>
-															<input
-																type="text"
-																bind:value={section.content.textColumn.buttonLink}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															/>
-														</div>
+
+													</div>
+												</div>
+
+												<!-- ボタン設定 -->
+												<div class="p-3 bg-gray-50 rounded border border-gray-200">
+													<button
+														on:click={() => {
+															const btn = document.getElementById('button-settings-' + section.id);
+															if (btn) btn.classList.toggle('hidden');
+														}}
+														class="w-full flex items-center justify-between text-left"
+													>
+														<h5 class="text-xs font-semibold text-gray-700">🔘 ボタン設定</h5>
+														<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500"><polyline points="6 9 12 15 18 9"></polyline></svg>
+													</button>
+													<div id="button-settings-{section.id}" class="mt-3 space-y-2">
+														{#if section.content.textColumn.buttonText !== undefined || section.content.textColumn.buttonLink !== undefined}
+															<div class="space-y-2">
+																<div>
+																	<label class="block text-xs font-medium text-gray-600 mb-1">ボタンテキスト</label>
+																	<input
+																		type="text"
+																		bind:value={section.content.textColumn.buttonText}
+																		placeholder="ボタンテキスト"
+																		class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+																	/>
+																</div>
+																<div>
+																	<label class="block text-xs font-medium text-gray-600 mb-1">ボタンリンク</label>
+																	<input
+																		type="text"
+																		bind:value={section.content.textColumn.buttonLink}
+																		placeholder="ボタンリンク (例: #, /contact)"
+																		class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+																	/>
+																</div>
+																<button
+																	on:click={() => {
+																		section.content.textColumn.buttonText = undefined;
+																		section.content.textColumn.buttonLink = undefined;
+																		sections = sections;
+																	}}
+																	class="w-full px-2 py-1 bg-red-50 text-red-600 border border-red-300 rounded text-sm font-semibold hover:bg-red-100 transition"
+																>
+																	ボタンを削除
+																</button>
+															</div>
+														{:else}
+															<button
+																on:click={() => {
+																	section.content.textColumn.buttonText = 'ボタン';
+																	section.content.textColumn.buttonLink = '#';
+																	sections = sections;
+																}}
+																class="w-full px-2 py-1 bg-green-50 text-green-600 border border-green-300 rounded text-sm font-semibold hover:bg-green-100 transition"
+															>
+																+ ボタンを追加
+															</button>
+														{/if}
 													</div>
 												</div>
 
@@ -1083,48 +2202,269 @@
 											<div class="space-y-4">
 												<!-- テキストカラム -->
 												<div class="p-3 bg-gray-50 rounded border border-gray-200">
-													<h5 class="text-xs font-semibold text-gray-700 mb-2">テキストカラム</h5>
-													<div class="space-y-2">
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">タイトル</label>
-															<input
-																type="text"
-																bind:value={section.content.textColumn.title}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															/>
+													<div class="flex items-center justify-between mb-3">
+														<h5 class="text-xs font-semibold text-gray-700">テキストカラム</h5>
+														<button
+															on:click={() => {
+																section.content.textColumn = {
+																	title: '',
+																	subtitle: '',
+																	description: '',
+																	buttonText: undefined,
+																	buttonLink: undefined
+																};
+																sections = sections;
+															}}
+															class="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+														>
+															リセット
+														</button>
+													</div>
+
+													<div class="space-y-3">
+														<!-- タイトル -->
+														<div class="p-2 border rounded-lg bg-white">
+															{#if section.content.textColumn.title !== undefined}
+																<div class="flex items-center justify-between mb-2">
+																	<span class="text-xs font-semibold text-gray-700">タイトル</span>
+																	<button
+																		on:click={() => {
+																			delete section.content.textColumn.title;
+																			delete section.content.textColumn.titleColor;
+																			delete section.content.textColumn.titleBold;
+																			delete section.content.textColumn.titleItalic;
+																			sections = sections;
+																		}}
+																		class="text-xs text-red-600 hover:text-red-800"
+																	>
+																		削除
+																	</button>
+																</div>
+																<input
+																	type="text"
+																	bind:value={section.content.textColumn.title}
+																	placeholder="タイトル"
+																	class="w-full px-2 py-1 border rounded text-sm mb-2"
+																/>
+																<div class="flex gap-2 items-center">
+																	<label class="flex items-center gap-1 text-xs">
+																		<input
+																			type="checkbox"
+																			bind:checked={section.content.textColumn.titleBold}
+																			class="rounded"
+																		/>
+																		<span class="font-bold">B</span>
+																	</label>
+																	<label class="flex items-center gap-1 text-xs">
+																		<input
+																			type="checkbox"
+																			bind:checked={section.content.textColumn.titleItalic}
+																			class="rounded"
+																		/>
+																		<span class="italic">I</span>
+																	</label>
+																	<div class="flex items-center gap-2 ml-auto">
+																		<input
+																			type="color"
+																			bind:value={section.content.textColumn.titleColor}
+																			class="w-6 h-6 rounded cursor-pointer"
+																		/>
+																		<input
+																			type="text"
+																			bind:value={section.content.textColumn.titleColor}
+																			placeholder="#000000"
+																			class="w-20 px-1 py-1 border rounded text-xs"
+																		/>
+																	</div>
+																</div>
+															{:else}
+																<button
+																	on:click={() => {
+																		section.content.textColumn.title = '';
+																		sections = sections;
+																	}}
+																	class="w-full px-2 py-1 border-2 border-dashed border-gray-300 rounded text-xs text-gray-500 hover:border-blue-500 hover:text-blue-500 transition"
+																>
+																	+ タイトルを追加
+																</button>
+															{/if}
 														</div>
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">サブタイトル</label>
-															<input
-																type="text"
-																bind:value={section.content.textColumn.subtitle}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															/>
+
+														<!-- サブタイトル -->
+														<div class="p-2 border rounded-lg bg-white">
+															{#if section.content.textColumn.subtitle !== undefined}
+																<div class="flex items-center justify-between mb-2">
+																	<span class="text-xs font-semibold text-gray-700">サブタイトル</span>
+																	<button
+																		on:click={() => {
+																			delete section.content.textColumn.subtitle;
+																			delete section.content.textColumn.subtitleColor;
+																			delete section.content.textColumn.subtitleBold;
+																			delete section.content.textColumn.subtitleItalic;
+																			sections = sections;
+																		}}
+																		class="text-xs text-red-600 hover:text-red-800"
+																	>
+																		削除
+																	</button>
+																</div>
+																<input
+																	type="text"
+																	bind:value={section.content.textColumn.subtitle}
+																	placeholder="サブタイトル"
+																	class="w-full px-2 py-1 border rounded text-sm mb-2"
+																/>
+																<div class="flex gap-2 items-center">
+																	<label class="flex items-center gap-1 text-xs">
+																		<input
+																			type="checkbox"
+																			bind:checked={section.content.textColumn.subtitleBold}
+																			class="rounded"
+																		/>
+																		<span class="font-bold">B</span>
+																	</label>
+																	<label class="flex items-center gap-1 text-xs">
+																		<input
+																			type="checkbox"
+																			bind:checked={section.content.textColumn.subtitleItalic}
+																			class="rounded"
+																		/>
+																		<span class="italic">I</span>
+																	</label>
+																	<div class="flex items-center gap-2 ml-auto">
+																		<input
+																			type="color"
+																			bind:value={section.content.textColumn.subtitleColor}
+																			class="w-6 h-6 rounded cursor-pointer"
+																		/>
+																		<input
+																			type="text"
+																			bind:value={section.content.textColumn.subtitleColor}
+																			placeholder="#000000"
+																			class="w-20 px-1 py-1 border rounded text-xs"
+																		/>
+																	</div>
+																</div>
+															{:else}
+																<button
+																	on:click={() => {
+																		section.content.textColumn.subtitle = '';
+																		sections = sections;
+																	}}
+																	class="w-full px-2 py-1 border-2 border-dashed border-gray-300 rounded text-xs text-gray-500 hover:border-blue-500 hover:text-blue-500 transition"
+																>
+																	+ サブタイトルを追加
+																</button>
+															{/if}
 														</div>
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">説明文</label>
-															<textarea
-																bind:value={section.content.textColumn.description}
-																rows="3"
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															></textarea>
+
+														<!-- 説明 -->
+														<div class="p-2 border rounded-lg bg-white">
+															{#if section.content.textColumn.description !== undefined}
+																<div class="flex items-center justify-between mb-2">
+																	<span class="text-xs font-semibold text-gray-700">説明</span>
+																	<button
+																		on:click={() => {
+																			delete section.content.textColumn.description;
+																			delete section.content.textColumn.descriptionColor;
+																			sections = sections;
+																		}}
+																		class="text-xs text-red-600 hover:text-red-800"
+																	>
+																		削除
+																	</button>
+																</div>
+																<textarea
+																	bind:value={section.content.textColumn.description}
+																	placeholder="説明"
+																	class="w-full px-2 py-1 border rounded text-sm mb-2"
+																	rows="3"
+																></textarea>
+																<div class="flex items-center gap-2">
+																	<input
+																		type="color"
+																		bind:value={section.content.textColumn.descriptionColor}
+																		class="w-6 h-6 rounded cursor-pointer"
+																	/>
+																	<input
+																		type="text"
+																		bind:value={section.content.textColumn.descriptionColor}
+																		placeholder="#000000"
+																		class="w-20 px-1 py-1 border rounded text-xs"
+																	/>
+																</div>
+															{:else}
+																<button
+																	on:click={() => {
+																		section.content.textColumn.description = '';
+																		sections = sections;
+																	}}
+																	class="w-full px-2 py-1 border-2 border-dashed border-gray-300 rounded text-xs text-gray-500 hover:border-blue-500 hover:text-blue-500 transition"
+																>
+																	+ 説明を追加
+																</button>
+															{/if}
 														</div>
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">ボタンテキスト</label>
-															<input
-																type="text"
-																bind:value={section.content.textColumn.buttonText}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															/>
-														</div>
-														<div>
-															<label class="block text-xs font-medium text-gray-600 mb-1">ボタンリンク</label>
-															<input
-																type="text"
-																bind:value={section.content.textColumn.buttonLink}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-															/>
-														</div>
+
+													</div>
+												</div>
+
+												<!-- ボタン設定 -->
+												<div class="p-3 bg-gray-50 rounded border border-gray-200">
+													<button
+														on:click={() => {
+															const btn = document.getElementById('button-settings-' + section.id);
+															if (btn) btn.classList.toggle('hidden');
+														}}
+														class="w-full flex items-center justify-between text-left"
+													>
+														<h5 class="text-xs font-semibold text-gray-700">🔘 ボタン設定</h5>
+														<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500"><polyline points="6 9 12 15 18 9"></polyline></svg>
+													</button>
+													<div id="button-settings-{section.id}" class="mt-3 space-y-2">
+														{#if section.content.textColumn.buttonText !== undefined || section.content.textColumn.buttonLink !== undefined}
+															<div class="space-y-2">
+																<div>
+																	<label class="block text-xs font-medium text-gray-600 mb-1">ボタンテキスト</label>
+																	<input
+																		type="text"
+																		bind:value={section.content.textColumn.buttonText}
+																		placeholder="ボタンテキスト"
+																		class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+																	/>
+																</div>
+																<div>
+																	<label class="block text-xs font-medium text-gray-600 mb-1">ボタンリンク</label>
+																	<input
+																		type="text"
+																		bind:value={section.content.textColumn.buttonLink}
+																		placeholder="ボタンリンク (例: #, /contact)"
+																		class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+																	/>
+																</div>
+																<button
+																	on:click={() => {
+																		section.content.textColumn.buttonText = undefined;
+																		section.content.textColumn.buttonLink = undefined;
+																		sections = sections;
+																	}}
+																	class="w-full px-2 py-1 bg-red-50 text-red-600 border border-red-300 rounded text-sm font-semibold hover:bg-red-100 transition"
+																>
+																	ボタンを削除
+																</button>
+															</div>
+														{:else}
+															<button
+																on:click={() => {
+																	section.content.textColumn.buttonText = 'ボタン';
+																	section.content.textColumn.buttonLink = '#';
+																	sections = sections;
+																}}
+																class="w-full px-2 py-1 bg-green-50 text-green-600 border border-green-300 rounded text-sm font-semibold hover:bg-green-100 transition"
+															>
+																+ ボタンを追加
+															</button>
+														{/if}
 													</div>
 												</div>
 
@@ -1225,12 +2565,20 @@
 													<div class="space-y-2">
 														<div>
 															<label class="block text-xs font-medium text-gray-600 mb-1">画像URL</label>
-															<input
-																type="text"
-																bind:value={section.content.imageColumn.imageUrl}
-																class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-																placeholder="https://..."
-															/>
+															<div class="flex gap-2">
+																<input
+																	type="text"
+																	bind:value={section.content.imageColumn.imageUrl}
+																	class="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+																	placeholder="https://..."
+																/>
+																<button
+																	on:click={() => openImagePicker(i, 'imageColumn.imageUrl')}
+																	class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition whitespace-nowrap"
+																>
+																	画像を選択
+																</button>
+															</div>
 														</div>
 														<div>
 															<label class="block text-xs font-medium text-gray-600 mb-1">画像の説明（Alt）</label>
@@ -1259,14 +2607,16 @@
 										{/if}
 
 										<!-- その他のセクションタイプ用のプレースホルダー -->
-										{#if !['hero', 'features', 'cta', 'contact', 'two_column_text_image', 'two_column_image_text', 'two_column_text_video', 'two_column_features_image'].includes(section.type)}
+										{#if !['hero', 'features', 'cta', 'contact', 'gallery', 'two_column_text_image', 'two_column_image_text', 'two_column_text_video', 'two_column_features_image'].includes(section.type)}
 											<p class="text-sm text-gray-500">このセクションタイプのコンテンツ編集は開発中です</p>
 										{/if}
 									</div>
 								</div>
 							{/if}
+								</div>
+							{/each}
 						</div>
-					{/each}
+					{/if}
 
 				</div>
 
@@ -1520,7 +2870,18 @@
 			<div class="flex-1 overflow-y-auto">
 				{#if leftPanelTab === 'preview'}
 					<!-- プレビュー -->
-					<div class="bg-white min-h-full">
+					<div class="bg-white min-h-full relative">
+						<!-- 全幅プレビューボタン -->
+						{#if sections.length > 0}
+							<button
+								on:click={() => (fullWidthPreview = true)}
+								class="absolute top-4 right-4 z-20 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition shadow-lg flex items-center gap-2"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+								全幅プレビュー
+							</button>
+						{/if}
+
 						{#if sections.length === 0}
 							<div class="flex items-center justify-center h-96 text-gray-400">
 								<div class="text-center">
@@ -1650,6 +3011,26 @@
 	</div>
 </div>
 
+<!-- トースト通知 -->
+{#if showToast}
+	<div
+		class="fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 {toastType === 'success'
+			? 'bg-green-600 text-white'
+			: toastType === 'error'
+				? 'bg-red-600 text-white'
+				: 'bg-blue-600 text-white'}"
+	>
+		{#if toastType === 'success'}
+			<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+		{:else if toastType === 'error'}
+			<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+		{:else}
+			<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+		{/if}
+		<span class="font-semibold">{toastMessage}</span>
+	</div>
+{/if}
+
 {#if form?.message}
 	<div
 		class="fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg {form.success
@@ -1712,3 +3093,35 @@
 		</div>
 	</div>
 {/if}
+
+<!-- 全幅プレビューモーダル -->
+{#if fullWidthPreview}
+	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+		<div class="bg-white w-full h-full overflow-auto">
+			<!-- ヘッダー -->
+			<div class="sticky top-0 bg-white border-b border-gray-200 z-10 px-6 py-4 flex items-center justify-between">
+				<h2 class="text-xl font-bold text-gray-800">全幅プレビュー（公開ページと同じ表示）</h2>
+				<button
+					on:click={() => (fullWidthPreview = false)}
+					class="px-4 py-2 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition"
+				>
+					閉じる
+				</button>
+			</div>
+
+			<!-- プレビュー内容 -->
+			<div class="bg-white min-h-full">
+				{#each sections as section}
+					<SectionRenderer {section} />
+				{/each}
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- 画像選択モーダル -->
+<ImagePicker
+	bind:show={showImagePicker}
+	onSelect={handleImageSelect}
+	landingPageId={lp?.id || ''}
+/>
