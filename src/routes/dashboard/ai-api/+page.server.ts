@@ -68,7 +68,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.eq('user_id', session.user.id)
 		.gte('created_at', startOfMonth.toISOString());
 
-	// 利用可能なモデルを取得（キャッシュされた静的リスト）
+	// 利用可能なGeminiモデル
 	const availableModels = [
 		{
 			value: 'models/gemini-1.5-flash-latest',
@@ -92,6 +92,30 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 	];
 
+	// 利用可能なClaudeモデル
+	const claudeModels = [
+		{
+			value: 'claude-3-5-sonnet-20241022',
+			label: 'Claude 3.5 Sonnet (最新)',
+			description: '最高性能・推奨'
+		},
+		{
+			value: 'claude-3-5-haiku-20241022',
+			label: 'Claude 3.5 Haiku',
+			description: '高速・軽量'
+		},
+		{
+			value: 'claude-3-opus-20240229',
+			label: 'Claude 3 Opus',
+			description: '最高品質'
+		},
+		{
+			value: 'claude-3-sonnet-20240229',
+			label: 'Claude 3 Sonnet',
+			description: 'バランス型'
+		}
+	];
+
 	return {
 		apiKeys: maskedKeys,
 		hasActiveKey,
@@ -100,7 +124,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			totalGenerations: totalGenerations || 0,
 			monthlyGenerations: monthlyGenerations || 0
 		},
-		availableModels
+		availableModels,
+		claudeModels
 	};
 };
 
@@ -175,6 +200,7 @@ export const actions: Actions = {
 		const keyName = formData.get('key_name')?.toString() || '';
 		const apiKey = formData.get('api_key')?.toString() || '';
 		const model = formData.get('model')?.toString() || 'models/gemini-1.5-flash-latest';
+		const provider = formData.get('provider')?.toString() || 'gemini';
 		const setAsActive = formData.get('set_as_active') === 'true';
 
 		// バリデーション
@@ -186,41 +212,76 @@ export const actions: Actions = {
 			return fail(400, { message: 'APIキーを入力してください' });
 		}
 
-		if (!apiKey.startsWith('AIza')) {
+		// プロバイダーに応じたバリデーション
+		if (provider === 'gemini' && !apiKey.startsWith('AIza')) {
 			return fail(400, { message: '無効なGemini APIキーです（AIzaで始まる必要があります）' });
+		}
+
+		if (provider === 'claude' && !apiKey.startsWith('sk-ant-')) {
+			return fail(400, { message: '無効なClaude APIキーです（sk-ant-で始まる必要があります）' });
 		}
 
 		// APIキーをテスト
 		try {
-			// models/プレフィックスがない場合は追加
-			const modelPath = model.startsWith('models/') ? model : `models/${model}`;
+			if (provider === 'gemini') {
+				// Gemini APIのテスト
+				const modelPath = model.startsWith('models/') ? model : `models/${model}`;
 
-			const response = await fetch(
-				`https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${apiKey}`,
-				{
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						contents: [{ parts: [{ text: 'こんにちは' }] }],
-						generationConfig: {
-							temperature: 0.7,
-							maxOutputTokens: 100
-						}
-					})
+				const response = await fetch(
+					`https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${apiKey}`,
+					{
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							contents: [{ parts: [{ text: 'こんにちは' }] }],
+							generationConfig: {
+								temperature: 0.7,
+								maxOutputTokens: 100
+							}
+						})
+					}
+				);
+
+				if (!response.ok) {
+					const errorData = await response.json();
+					console.error('Gemini API Key Test Error:', errorData);
+					return fail(400, {
+						message: `Gemini APIキーが無効です: ${errorData.error?.message || '接続テストに失敗しました'}`
+					});
 				}
-			);
 
-			if (!response.ok) {
-				const errorData = await response.json();
-				console.error('API Key Test Error:', errorData);
-				return fail(400, {
-					message: `APIキーが無効です: ${errorData.error?.message || '接続テストに失敗しました'}`
+				const result = await response.json();
+				if (!result.candidates || result.candidates.length === 0) {
+					return fail(400, { message: 'APIキーは有効ですが、応答が空です' });
+				}
+			} else if (provider === 'claude') {
+				// Claude APIのテスト
+				const response = await fetch('https://api.anthropic.com/v1/messages', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'x-api-key': apiKey,
+						'anthropic-version': '2023-06-01'
+					},
+					body: JSON.stringify({
+						model: model,
+						max_tokens: 100,
+						messages: [{ role: 'user', content: 'こんにちは' }]
+					})
 				});
-			}
 
-			const result = await response.json();
-			if (!result.candidates || result.candidates.length === 0) {
-				return fail(400, { message: 'APIキーは有効ですが、応答が空です' });
+				if (!response.ok) {
+					const errorData = await response.json();
+					console.error('Claude API Key Test Error:', errorData);
+					return fail(400, {
+						message: `Claude APIキーが無効です: ${errorData.error?.message || '接続テストに失敗しました'}`
+					});
+				}
+
+				const result = await response.json();
+				if (!result.content || result.content.length === 0) {
+					return fail(400, { message: 'APIキーは有効ですが、応答が空です' });
+				}
 			}
 		} catch (error) {
 			console.error('API Key Validation Error:', error);
@@ -243,6 +304,7 @@ export const actions: Actions = {
 			key_name: keyName,
 			api_key: apiKey,
 			model: model,
+			provider: provider,
 			is_active: setAsActive
 		};
 

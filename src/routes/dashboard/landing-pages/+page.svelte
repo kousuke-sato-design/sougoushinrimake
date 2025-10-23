@@ -183,9 +183,9 @@
 
 						<!-- アクションボタン -->
 						<div class="flex gap-2">
-							{#if lp.status === 'published'}
+							{#if lp.status === 'published' && lp.sites}
 								<a
-									href="/lp/{lp.slug}"
+									href="/WEBTHQ/{lp.sites.slug}/{lp.slug}"
 									target="_blank"
 									rel="noopener noreferrer"
 									class="flex-1 px-4 py-2 bg-green-600 text-white text-center rounded-lg text-sm font-medium hover:bg-green-700 transition"

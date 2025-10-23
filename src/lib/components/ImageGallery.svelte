@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { Upload, X, Copy, Check, Image as ImageIcon } from 'lucide-svelte';
+	import { onMount } from 'svelte';
 
 	export let landingPageId: string = '';
 	export let siteId: string = '';
+	export let sections: any[] = []; // LPのセクション情報
 
 	interface UploadedImage {
 		url: string;
@@ -16,6 +18,63 @@
 	let error = '';
 	let dragActive = false;
 	let copiedUrl: string | null = null;
+
+	// LPセクションから画像URLを抽出
+	function extractImagesFromSections() {
+		const imageUrls = new Set<string>();
+
+		sections.forEach((section: any) => {
+			// 背景画像
+			if (section.style?.backgroundImage?.url && typeof section.style.backgroundImage.url === 'string') {
+				imageUrls.add(section.style.backgroundImage.url);
+			}
+
+			// 2カラムセクションの画像
+			if (section.content?.imageColumn?.imageUrl) {
+				imageUrls.add(section.content.imageColumn.imageUrl);
+			}
+
+			// ギャラリーセクションの画像
+			if (section.content?.images && Array.isArray(section.content.images)) {
+				section.content.images.forEach((img: any) => {
+					if (img.url) imageUrls.add(img.url);
+				});
+			}
+
+			// Heroセクションの背景画像
+			if (section.content?.backgroundImage && typeof section.content.backgroundImage === 'string') {
+				imageUrls.add(section.content.backgroundImage);
+			}
+		});
+
+		// URLから画像情報を生成
+		const extractedImages: UploadedImage[] = Array.from(imageUrls)
+			.filter(url => url && url.trim() !== '')
+			.map(url => {
+				const fileName = url.split('/').pop() || 'image';
+				return {
+					url,
+					path: url,
+					name: fileName,
+					uploadedAt: new Date()
+				};
+			});
+
+		// 既存のアップロード画像と統合（重複を除く）
+		const existingUrls = new Set(images.map(img => img.url));
+		const newImages = extractedImages.filter(img => !existingUrls.has(img.url));
+
+		images = [...images, ...newImages];
+	}
+
+	// sectionsが変更されたら画像を再抽出
+	$: if (sections && sections.length > 0) {
+		extractImagesFromSections();
+	}
+
+	onMount(() => {
+		extractImagesFromSections();
+	});
 
 	// ドラッグ&ドロップイベント
 	function handleDragEnter(e: DragEvent) {

@@ -16,6 +16,8 @@
 	import TwoColumnImageTextSection from './TwoColumnImageTextSection.svelte';
 	import TwoColumnTextVideoSection from './TwoColumnTextVideoSection.svelte';
 	import TwoColumnFeaturesImageSection from './TwoColumnFeaturesImageSection.svelte';
+	import TwoColumnTextContactSection from './TwoColumnTextContactSection.svelte';
+	import TwoColumnContactImageSection from './TwoColumnContactImageSection.svelte';
 
 	export let section: Section;
 
@@ -191,6 +193,10 @@
 				<TwoColumnTextVideoSection {section} />
 			{:else if section.type === 'two_column_features_image'}
 				<TwoColumnFeaturesImageSection {section} />
+			{:else if section.type === 'two_column_text_contact'}
+				<TwoColumnTextContactSection {section} />
+			{:else if section.type === 'two_column_contact_image'}
+				<TwoColumnContactImageSection {section} />
 			{:else if section.type === 'custom'}
 				<div class="py-16">
 					{@html section.content.html}

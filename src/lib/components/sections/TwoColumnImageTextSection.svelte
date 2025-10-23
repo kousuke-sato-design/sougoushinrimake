@@ -12,15 +12,17 @@
 		<div class="grid grid-cols-1 {gridClass} gap-8 items-center">
 			<!-- 画像カラム -->
 			<div class="rounded-lg overflow-hidden shadow-xl">
-				<img
-					src={section.content.imageColumn.imageUrl}
-					alt={section.content.imageColumn.imageAlt}
-					class="w-full h-auto object-cover"
-				/>
-				{#if section.content.imageColumn.caption}
-					<p class="text-sm text-gray-500 text-center mt-2 px-4">
-						{section.content.imageColumn.caption}
-					</p>
+				{#if section.content.imageColumn.imageUrl && typeof section.content.imageColumn.imageUrl === 'string'}
+					<img
+						src={section.content.imageColumn.imageUrl}
+						alt={section.content.imageColumn.imageAlt || ''}
+						class="w-full h-auto object-cover"
+					/>
+					{#if section.content.imageColumn.caption}
+						<p class="text-sm text-gray-500 text-center mt-2 px-4">
+							{section.content.imageColumn.caption}
+						</p>
+					{/if}
 				{/if}
 			</div>
 

@@ -9,7 +9,9 @@
 		Users,
 		Mail,
 		Bot,
-		Settings
+		Settings,
+		Server,
+		ClipboardList
 	} from 'lucide-svelte';
 
 	export let data: LayoutData;
@@ -25,7 +27,9 @@
 		{ href: '/dashboard/sites', label: 'サイト一覧', icon: Globe },
 		{ href: '/dashboard/landing-pages', label: 'LP一覧', icon: FileText },
 		{ href: '/dashboard/customers', label: '顧客リスト', icon: Users },
-		{ href: '/dashboard/email', label: 'メール送信', icon: Mail },
+		{ href: '/dashboard/form-templates', label: 'フォームテンプレート', icon: ClipboardList },
+		{ href: '/dashboard/imap-settings', label: 'IMAP設定', icon: Server },
+		{ href: '/dashboard/email-settings', label: 'メール設定', icon: Mail },
 		{ href: '/dashboard/ai-api', label: 'AI API', icon: Bot },
 		{ href: '/dashboard/settings', label: '設定', icon: Settings }
 	];

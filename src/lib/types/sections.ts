@@ -18,7 +18,9 @@ export type SectionType =
 	| 'two_column_text_image'
 	| 'two_column_image_text'
 	| 'two_column_text_video'
-	| 'two_column_features_image';
+	| 'two_column_features_image'
+	| 'two_column_text_contact'
+	| 'two_column_contact_image';
 
 export interface BaseSection {
 	id: string;
@@ -98,6 +100,12 @@ export interface ContactSection extends BaseSection {
 			placeholder?: string;
 		}>;
 		submitButtonText: string;
+		// 専用ページモード設定
+		useDedicatedPage?: boolean; // true: /contactへのリンクボタン表示、false: インラインフォーム表示
+		dedicatedPageButtonText?: string; // 専用ページへのボタンテキスト（デフォルト: "お問い合わせはこちら"）
+		titleColor?: string;
+		descriptionColor?: string;
+		fontFamily?: string;
 	};
 }
 
@@ -343,6 +351,62 @@ export interface TwoColumnFeaturesImageSection extends BaseSection {
 	};
 }
 
+export interface TwoColumnTextContactSection extends BaseSection {
+	type: 'two_column_text_contact';
+	content: {
+		textColumn: {
+			title?: string;
+			subtitle?: string;
+			description?: string;
+			titleColor?: string;
+			subtitleColor?: string;
+			descriptionColor?: string;
+			fontFamily?: string;
+		};
+		contactColumn: {
+			formFields: Array<{
+				name: string;
+				label: string;
+				type: 'text' | 'email' | 'tel' | 'textarea';
+				required: boolean;
+				placeholder?: string;
+			}>;
+			submitButtonText: string;
+			useDedicatedPage?: boolean;
+			dedicatedPageButtonText?: string;
+		};
+		layout: {
+			ratio: '50-50' | '60-40' | '40-60';
+		};
+	};
+}
+
+export interface TwoColumnContactImageSection extends BaseSection {
+	type: 'two_column_contact_image';
+	content: {
+		contactColumn: {
+			formFields: Array<{
+				name: string;
+				label: string;
+				type: 'text' | 'email' | 'tel' | 'textarea';
+				required: boolean;
+				placeholder?: string;
+			}>;
+			submitButtonText: string;
+			useDedicatedPage?: boolean;
+			dedicatedPageButtonText?: string;
+		};
+		imageColumn: {
+			imageUrl: string;
+			imageAlt: string;
+			caption?: string;
+		};
+		layout: {
+			ratio: '50-50' | '60-40' | '40-60';
+		};
+	};
+}
+
 export type Section =
 	| HeroSection
 	| FeaturesSection
@@ -361,7 +425,9 @@ export type Section =
 	| TwoColumnTextImageSection
 	| TwoColumnImageTextSection
 	| TwoColumnTextVideoSection
-	| TwoColumnFeaturesImageSection;
+	| TwoColumnFeaturesImageSection
+	| TwoColumnTextContactSection
+	| TwoColumnContactImageSection;
 
 export interface PageContent {
 	sections: Section[];

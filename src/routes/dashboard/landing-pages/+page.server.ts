@@ -7,10 +7,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		return { landingPages: [] };
 	}
 
-	// ユーザーのLP一覧を取得（最新順）
+	// ユーザーのLP一覧を取得（最新順）- sitesテーブルをJOINしてsite.slugも取得
 	const { data: landingPages, error } = await locals.supabase
 		.from('landing_pages')
-		.select('id, title, slug, lp_type, status, content, site_id, user_id, created_at, updated_at, description')
+		.select('id, title, slug, lp_type, status, content, site_id, user_id, created_at, updated_at, description, sites(slug)')
 		.eq('user_id', session.user.id)
 		.order('created_at', { ascending: false });
 

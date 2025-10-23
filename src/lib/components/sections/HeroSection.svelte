@@ -13,10 +13,18 @@
 			? `background-color: ${content.backgroundColor};`
 			: '';
 
-	// テキスト色のスタイル
+	// テキスト色のスタイル（全体のデフォルト）
 	$: textColorStyle = section.style?.textColor
 		? `color: ${section.style.textColor};`
 		: '';
+
+	// 個別の色設定
+	$: titleColorStyle = content.titleColor ? `color: ${content.titleColor};` : textColorStyle;
+	$: subtitleColorStyle = content.subtitleColor ? `color: ${content.subtitleColor};` : textColorStyle;
+	$: descriptionColorStyle = content.descriptionColor ? `color: ${content.descriptionColor};` : textColorStyle;
+
+	// フォントファミリー設定
+	$: fontFamilyStyle = content.fontFamily ? `font-family: ${content.fontFamily};` : '';
 
 	// 背景画像の設定
 	$: backgroundImage = section.style?.backgroundImage;
@@ -78,7 +86,7 @@
 
 <section
 	class="{SPACING.section} relative overflow-hidden"
-	style="{backgroundColorStyle} {textColorStyle}"
+	style="{backgroundColorStyle} {textColorStyle} {fontFamilyStyle}"
 >
 	<!-- 背景画像レイヤー（最背面・全幅） -->
 	{#if bgUrl}
@@ -101,19 +109,19 @@
 	<!-- コンテンツレイヤー -->
 	<div class="max-w-4xl mx-auto px-4 text-center relative z-10">
 		{#if content.title}
-			<h1 class="{TYPOGRAPHY.h1} mb-6" style={textColorStyle}>
+			<h1 class="{TYPOGRAPHY.h1} mb-6" style={titleColorStyle}>
 				{content.title}
 			</h1>
 		{/if}
 
 		{#if content.subtitle}
-			<h2 class="{TYPOGRAPHY.h3} mb-4" style={textColorStyle}>
+			<h2 class="{TYPOGRAPHY.h3} mb-4" style={subtitleColorStyle}>
 				{content.subtitle}
 			</h2>
 		{/if}
 
 		{#if content.description}
-			<p class="{TYPOGRAPHY.body} mb-8 max-w-2xl mx-auto" style={textColorStyle}>
+			<p class="{TYPOGRAPHY.body} mb-8 max-w-2xl mx-auto" style={descriptionColorStyle}>
 				{content.description}
 			</p>
 		{/if}

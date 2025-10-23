@@ -9,6 +9,7 @@
 	let apiKeyInput = '';
 	let keyNameInput = '';
 	let selectedModel = 'models/gemini-1.5-flash-latest';
+	let selectedProvider: 'gemini' | 'claude' = 'gemini';
 	let setAsActive = true;
 	let isAdding = false;
 	let selectedLog: any = null;
@@ -16,8 +17,16 @@
 	let loadingModels = false;
 	let fetchedModels: any[] = [];
 
-	// 利用可能なGeminiモデル（デフォルト）
-	$: availableModels = fetchedModels.length > 0 ? fetchedModels : data.availableModels;
+	// 利用可能なモデル（プロバイダーに応じて変更）
+	$: availableModels = fetchedModels.length > 0 ? fetchedModels :
+		selectedProvider === 'gemini' ? data.availableModels : data.claudeModels;
+
+	// プロバイダー変更時にデフォルトモデルを設定
+	$: if (selectedProvider === 'claude') {
+		selectedModel = 'claude-3-5-sonnet-20241022';
+	} else if (selectedProvider === 'gemini') {
+		selectedModel = 'models/gemini-1.5-flash-latest';
+	}
 
 	// 最終更新日時のフォーマット
 	function formatDate(dateString: string | null) {
@@ -270,6 +279,36 @@
 					class="space-y-4"
 				>
 					<div class="space-y-4">
+						<!-- AIプロバイダー選択 -->
+						<div>
+							<label class="block text-sm font-medium text-gray-700 mb-2">
+								AIプロバイダー <span class="text-red-500">*</span>
+							</label>
+							<div class="grid grid-cols-2 gap-3">
+								<button
+									type="button"
+									on:click={() => selectedProvider = 'gemini'}
+									class="px-4 py-3 border-2 rounded-lg transition {selectedProvider === 'gemini' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300 hover:border-gray-400'}"
+								>
+									<div class="flex items-center justify-center gap-2">
+										<span class="text-2xl">🔷</span>
+										<span class="font-semibold">Gemini</span>
+									</div>
+								</button>
+								<button
+									type="button"
+									on:click={() => selectedProvider = 'claude'}
+									class="px-4 py-3 border-2 rounded-lg transition {selectedProvider === 'claude' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-300 hover:border-gray-400'}"
+								>
+									<div class="flex items-center justify-center gap-2">
+										<span class="text-2xl">🟣</span>
+										<span class="font-semibold">Claude</span>
+									</div>
+								</button>
+							</div>
+							<input type="hidden" name="provider" value={selectedProvider} />
+						</div>
+
 						<div class="grid md:grid-cols-2 gap-4">
 							<div>
 								<label class="block text-sm font-medium text-gray-700 mb-2">
@@ -286,14 +325,14 @@
 							</div>
 							<div>
 								<label class="block text-sm font-medium text-gray-700 mb-2">
-									Gemini APIキー <span class="text-red-500">*</span>
+									{selectedProvider === 'gemini' ? 'Gemini' : 'Claude'} APIキー <span class="text-red-500">*</span>
 								</label>
 								<div class="relative">
 									<input
 										type={showApiKey ? 'text' : 'password'}
 										name="api_key"
 										bind:value={apiKeyInput}
-										placeholder="AIza..."
+										placeholder={selectedProvider === 'gemini' ? 'AIza...' : 'sk-ant-...'}
 										required
 										class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
 									/>
@@ -313,18 +352,20 @@
 								<label class="block text-sm font-medium text-gray-700">
 									使用モデル <span class="text-red-500">*</span>
 								</label>
-								<button
-									type="button"
-									on:click={fetchModelsFromApi}
-									disabled={loadingModels || !apiKeyInput}
-									class="text-xs px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-								>
-									{#if loadingModels}
-										取得中...
-									{:else}
-										🔄 APIから取得
-									{/if}
-								</button>
+								{#if selectedProvider === 'gemini'}
+									<button
+										type="button"
+										on:click={fetchModelsFromApi}
+										disabled={loadingModels || !apiKeyInput}
+										class="text-xs px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+									>
+										{#if loadingModels}
+											取得中...
+										{:else}
+											🔄 APIから取得
+										{/if}
+									</button>
+								{/if}
 							</div>
 							<select
 								name="model"
@@ -339,10 +380,12 @@
 								{/each}
 							</select>
 							<p class="text-xs text-gray-500 mt-1">
-								{#if fetchedModels.length > 0}
+								{#if fetchedModels.length > 0 && selectedProvider === 'gemini'}
 									✓ APIから{fetchedModels.length}個のモデルを取得しました
-								{:else}
+								{:else if selectedProvider === 'gemini'}
 									LP生成時に使用するGeminiモデルを選択してください
+								{:else}
+									LP生成時に使用するClaudeモデルを選択してください
 								{/if}
 							</p>
 						</div>
