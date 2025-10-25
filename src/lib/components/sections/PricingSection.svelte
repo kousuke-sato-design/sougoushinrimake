@@ -58,7 +58,7 @@
 					</ul>
 
 					<a
-						href={plan.buttonLink}
+						href={typeof plan.buttonLink === 'string' ? plan.buttonLink : '#'}
 						class="block w-full text-center px-6 py-3 rounded-lg font-semibold transition {plan.highlighted
 							? 'bg-pink-600 text-white hover:bg-pink-700'
 							: 'bg-gray-100 text-gray-800 hover:bg-gray-200'}"

@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 
 	export let section: ContactSection;
+	export let landingPageId: string = '';
 
 	$: content = section.content;
 	$: siteSlug = $page.params.site_slug;
@@ -14,10 +15,54 @@
 	$: descriptionColorStyle = content.descriptionColor ? `color: ${content.descriptionColor};` : '';
 	$: fontFamilyStyle = content.fontFamily ? `font-family: ${content.fontFamily};` : '';
 
-	function handleSubmit(e: Event) {
+	let submitting = false;
+	let submitSuccess = false;
+	let submitError = '';
+
+	async function handleSubmit(e: Event) {
 		e.preventDefault();
-		// フォーム送信処理はここに実装
-		alert('フォーム送信機能は後で実装されます');
+		submitting = true;
+		submitSuccess = false;
+		submitError = '';
+
+		const form = e.target as HTMLFormElement;
+		const formData = new FormData(form);
+		const data: Record<string, any> = {};
+
+		formData.forEach((value, key) => {
+			data[key] = value;
+		});
+
+		try {
+			const response = await fetch('/api/submit-form', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					formData: data,
+					sectionId: section.id,
+					landingPageId
+				})
+			});
+
+			const result = await response.json();
+
+			if (response.ok && result.success) {
+				submitSuccess = true;
+				form.reset();
+				setTimeout(() => {
+					submitSuccess = false;
+				}, 5000);
+			} else {
+				submitError = result.error || 'フォーム送信に失敗しました';
+			}
+		} catch (err: any) {
+			console.error('Submit error:', err);
+			submitError = 'フォーム送信中にエラーが発生しました';
+		} finally {
+			submitting = false;
+		}
 	}
 </script>
 
@@ -49,8 +94,21 @@
 			</div>
 		{:else}
 			<!-- インラインフォーム表示モード -->
-			<form on:submit={handleSubmit} class="space-y-6 bg-white p-8 rounded-lg shadow-lg">
-				{#each content.formFields as field}
+			{#if submitSuccess}
+				<div class="p-6 bg-green-50 border-2 border-green-500 rounded-lg text-center">
+					<div class="text-green-600 text-5xl mb-4">✓</div>
+					<h3 class="text-2xl font-bold text-green-800 mb-2">送信完了</h3>
+					<p class="text-green-700">お問い合わせありがとうございます。<br>担当者より折り返しご連絡いたします。</p>
+				</div>
+			{:else}
+				<form on:submit={handleSubmit} class="space-y-6 bg-white p-8 rounded-lg shadow-lg">
+					{#if submitError}
+						<div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+							<p class="text-sm text-red-600">{submitError}</p>
+						</div>
+					{/if}
+
+					{#each content.formFields as field}
 					<div>
 						<label for={field.name} class="block text-sm font-medium text-gray-700 mb-2">
 							{field.label}
@@ -81,13 +139,15 @@
 					</div>
 				{/each}
 
-				<button
-					type="submit"
-					class="w-full px-8 py-4 bg-blue-600 text-white rounded-lg font-semibold text-lg hover:bg-blue-700 transition"
-				>
-					{content.submitButtonText}
-				</button>
-			</form>
+					<button
+						type="submit"
+						disabled={submitting}
+						class="w-full px-8 py-4 bg-blue-600 text-white rounded-lg font-semibold text-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+					>
+						{submitting ? '送信中...' : content.submitButtonText}
+					</button>
+				</form>
+			{/if}
 		{/if}
 	</div>
 </section>

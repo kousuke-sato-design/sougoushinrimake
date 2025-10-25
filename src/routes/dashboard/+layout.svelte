@@ -11,7 +11,8 @@
 		Bot,
 		Settings,
 		Server,
-		ClipboardList
+		ClipboardList,
+		Clock
 	} from 'lucide-svelte';
 
 	export let data: LayoutData;
@@ -27,6 +28,7 @@
 		{ href: '/dashboard/sites', label: 'サイト一覧', icon: Globe },
 		{ href: '/dashboard/landing-pages', label: 'LP一覧', icon: FileText },
 		{ href: '/dashboard/customers', label: '顧客リスト', icon: Users },
+		{ href: '/dashboard/work-history', label: '作業履歴', icon: Clock },
 		{ href: '/dashboard/form-templates', label: 'フォームテンプレート', icon: ClipboardList },
 		{ href: '/dashboard/imap-settings', label: 'IMAP設定', icon: Server },
 		{ href: '/dashboard/email-settings', label: 'メール設定', icon: Mail },

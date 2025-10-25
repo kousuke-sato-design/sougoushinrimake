@@ -11,15 +11,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const search = url.searchParams.get('search') || '';
 	const status = url.searchParams.get('status') || '';
 
-	// クエリの構築
+	// クエリの構築（LP情報も取得）
 	let query = locals.supabase
 		.from('customers')
-		.select('*', { count: 'exact' })
+		.select('*, landing_pages(id, title, slug)', { count: 'exact' })
 		.eq('user_id', session.user.id);
 
-	// 検索条件
+	// 検索条件（データベースの列名に合わせる）
 	if (search) {
-		query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+		query = query.or(`contact_name.ilike.%${search}%,email.ilike.%${search}%,company_name.ilike.%${search}%`);
 	}
 
 	// ステータスフィルター
@@ -32,8 +32,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const { data: customers, count } = await query;
 
+	// データベースの列名をフロントエンドで使いやすい形式にマッピング
+	const mappedCustomers = (customers || []).map(c => ({
+		...c,
+		name: c.contact_name || c.name, // contact_name を name にマッピング
+		company: c.company_name || c.company // company_name を company にマッピング
+	}));
+
 	return {
-		customers: customers || [],
+		customers: mappedCustomers,
 		total: count || 0
 	};
 };

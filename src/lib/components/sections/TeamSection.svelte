@@ -25,7 +25,7 @@
 		<div class="grid md:grid-cols-{Math.min(content.members.length, 4)} gap-8 mt-8">
 			{#each content.members as member}
 				<div class="bg-white rounded-lg shadow-md overflow-hidden text-center">
-					{#if member.avatar}
+					{#if member.avatar && typeof member.avatar === 'string'}
 						<img
 							src={member.avatar}
 							alt={member.name}
@@ -51,7 +51,7 @@
 							<div class="flex gap-3 justify-center">
 								{#if member.social.twitter}
 									<a
-										href={member.social.twitter}
+										href={typeof member.social.twitter === 'string' ? member.social.twitter : '#'}
 										target="_blank"
 										rel="noopener noreferrer"
 										class="text-gray-400 hover:text-blue-500 transition"
@@ -61,7 +61,7 @@
 								{/if}
 								{#if member.social.linkedin}
 									<a
-										href={member.social.linkedin}
+										href={typeof member.social.linkedin === 'string' ? member.social.linkedin : '#'}
 										target="_blank"
 										rel="noopener noreferrer"
 										class="text-gray-400 hover:text-blue-700 transition"
@@ -71,7 +71,7 @@
 								{/if}
 								{#if member.social.github}
 									<a
-										href={member.social.github}
+										href={typeof member.social.github === 'string' ? member.social.github : '#'}
 										target="_blank"
 										rel="noopener noreferrer"
 										class="text-gray-400 hover:text-gray-900 transition"

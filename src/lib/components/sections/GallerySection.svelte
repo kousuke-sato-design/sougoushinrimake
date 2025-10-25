@@ -24,7 +24,7 @@
 		<!-- レスポンシブグリッド: モバイル1列、タブレット2列、デスクトップ3列 -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
 			{#each content.images as image}
-				{#if image.url}
+				{#if image.url && typeof image.url === 'string'}
 					<div class="group relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-all duration-300 bg-transparent">
 						<img
 							src={image.url}

@@ -47,7 +47,7 @@
 				{#if section.content.textColumn.buttonText}
 					<div class="pt-4">
 						<a
-							href={section.content.textColumn.buttonLink || '#'}
+							href={typeof section.content.textColumn.buttonLink === 'string' ? section.content.textColumn.buttonLink : '#'}
 							class="inline-block px-8 py-3 bg-pink-600 text-white font-semibold rounded-lg hover:bg-pink-700 transition"
 						>
 							{section.content.textColumn.buttonText}

@@ -20,6 +20,7 @@
 	import TwoColumnContactImageSection from './TwoColumnContactImageSection.svelte';
 
 	export let section: Section;
+	export let landingPageId: string = '';
 
 	// セクションスタイルを構築
 	$: sectionStyle = buildSectionStyle(section);
@@ -46,8 +47,16 @@
 	function buildBackgroundImageStyle(section: Section): string {
 		if (!section.style?.backgroundImage) return '';
 
-		const opacity = section.style.backgroundImageOpacity ?? 1;
-		return `background-image: url('${section.style.backgroundImage}'); background-size: cover; background-position: center; opacity: ${opacity};`;
+		// backgroundImageがオブジェクトの場合はurlプロパティを使用
+		const bgImage = typeof section.style.backgroundImage === 'string'
+			? section.style.backgroundImage
+			: section.style.backgroundImage.url;
+
+		// URLが文字列でない場合は空文字を返す
+		if (typeof bgImage !== 'string') return '';
+
+		const opacity = section.style.backgroundImageOpacity ?? section.style.backgroundImage.opacity ?? 1;
+		return `background-image: url('${bgImage}'); background-size: cover; background-position: center; opacity: ${opacity};`;
 	}
 
 	// 画像レイアウトがあるかチェック
@@ -66,12 +75,12 @@
 				{#if section.images?.layout === 'two-column'}
 					<!-- 2つの画像を並べて表示 -->
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-8 py-16">
-						{#if section.images.leftImage}
+						{#if section.images.leftImage && typeof section.images.leftImage === 'string'}
 							<div class="rounded-lg overflow-hidden shadow-lg">
 								<img src={section.images.leftImage} alt="Left" class="w-full h-full object-cover" />
 							</div>
 						{/if}
-						{#if section.images.rightImage}
+						{#if section.images.rightImage && typeof section.images.rightImage === 'string'}
 							<div class="rounded-lg overflow-hidden shadow-lg">
 								<img src={section.images.rightImage} alt="Right" class="w-full h-full object-cover" />
 							</div>
@@ -80,7 +89,7 @@
 				{:else if section.images?.layout === 'image-left'}
 					<!-- 画像左、コンテンツ右 -->
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center py-16">
-						{#if section.images.leftImage}
+						{#if section.images.leftImage && typeof section.images.leftImage === 'string'}
 							<div class="rounded-lg overflow-hidden shadow-lg">
 								<img src={section.images.leftImage} alt="Section" class="w-full h-auto object-cover" />
 							</div>
@@ -93,7 +102,7 @@
 							{:else if section.type === 'cta'}
 								<CTASection {section} />
 							{:else if section.type === 'contact'}
-								<ContactSection {section} />
+								<ContactSection {section} {landingPageId} />
 							{:else if section.type === 'pricing'}
 								<PricingSection {section} />
 							{:else if section.type === 'testimonials'}
@@ -128,7 +137,7 @@
 							{:else if section.type === 'cta'}
 								<CTASection {section} />
 							{:else if section.type === 'contact'}
-								<ContactSection {section} />
+								<ContactSection {section} {landingPageId} />
 							{:else if section.type === 'pricing'}
 								<PricingSection {section} />
 							{:else if section.type === 'testimonials'}
@@ -151,7 +160,7 @@
 								</div>
 							{/if}
 						</div>
-						{#if section.images.rightImage}
+						{#if section.images.rightImage && typeof section.images.rightImage === 'string'}
 							<div class="rounded-lg overflow-hidden shadow-lg">
 								<img src={section.images.rightImage} alt="Section" class="w-full h-auto object-cover" />
 							</div>
@@ -168,7 +177,7 @@
 			{:else if section.type === 'cta'}
 				<CTASection {section} />
 			{:else if section.type === 'contact'}
-				<ContactSection {section} />
+				<ContactSection {section} {landingPageId} />
 			{:else if section.type === 'pricing'}
 				<PricingSection {section} />
 			{:else if section.type === 'testimonials'}
@@ -194,9 +203,9 @@
 			{:else if section.type === 'two_column_features_image'}
 				<TwoColumnFeaturesImageSection {section} />
 			{:else if section.type === 'two_column_text_contact'}
-				<TwoColumnTextContactSection {section} />
+				<TwoColumnTextContactSection {section} {landingPageId} />
 			{:else if section.type === 'two_column_contact_image'}
-				<TwoColumnContactImageSection {section} />
+				<TwoColumnContactImageSection {section} {landingPageId} />
 			{:else if section.type === 'custom'}
 				<div class="py-16">
 					{@html section.content.html}

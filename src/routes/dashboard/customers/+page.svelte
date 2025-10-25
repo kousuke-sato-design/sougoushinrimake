@@ -179,6 +179,9 @@
 						</th>
 						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">会社</th>
 						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+							送信元
+						</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
 							ステータス
 						</th>
 						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -201,6 +204,18 @@
 							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{customer.email}</td>
 							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
 								{customer.company || '-'}
+							</td>
+							<td class="px-6 py-4 text-sm text-gray-600">
+								{#if customer.landing_pages}
+									<div class="font-medium text-gray-900">{customer.landing_pages.title}</div>
+									{#if customer.custom_fields?._meta?.form_template_name}
+										<div class="text-xs text-gray-500 mt-1">
+											フォーム: {customer.custom_fields._meta.form_template_name}
+										</div>
+									{/if}
+								{:else}
+									<span class="text-gray-400">-</span>
+								{/if}
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<span class="px-2 py-1 text-xs rounded-full {getStatusColor(customer.status)}">

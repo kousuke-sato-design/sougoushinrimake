@@ -5,13 +5,12 @@
 	import type { EmailSetting } from '$lib/types/email';
 	import type { FormTemplate } from '$lib/types/form';
 	import SectionRenderer from '$lib/components/sections/SectionRenderer.svelte';
-	import AIChat from '$lib/components/AIChat.svelte';
 	import HistoryPanel from '$lib/components/HistoryPanel.svelte';
 	import ImageGallery from '$lib/components/ImageGallery.svelte';
 	import { supabase } from '$lib/supabaseClient';
 	import { onMount } from 'svelte';
+	import { recordWorkHistory } from '$lib/utils/workHistory';
 	import {
-		Bot,
 		Sparkles,
 		Grid3x3,
 		Megaphone,
@@ -41,6 +40,7 @@
 	import ImagePicker from '$lib/components/ImagePicker.svelte';
 	import { dndzone } from 'svelte-dnd-action';
 	import { flip } from 'svelte/animate';
+	import { activeWorkSession, addChangedFile } from '$lib/stores/workSession';
 
 	export let data: PageData;
 	export let form: ActionData;
@@ -49,10 +49,116 @@
 	let sections: Section[] = (lp?.content?.sections as Section[]) || [];
 	let currentStatus = lp?.status || 'draft';
 	let saving = false;
-	let leftPanelTab: 'preview' | 'history' | 'source' = 'preview';
+	let leftPanelTab: 'preview' | 'source' | 'history' | 'work-history' = 'preview';
+
+	// 初期化時にbuttonLinkとソーシャルリンクをクリーンアップ
+	sections = sections.map((section, index) => {
+		const cleanedSection = { ...section };
+		if (cleanedSection.content) {
+			// 直接buttonLinkがある場合
+			if (cleanedSection.content.buttonLink && typeof cleanedSection.content.buttonLink !== 'string') {
+				cleanedSection.content.buttonLink = '#';
+			}
+			// textColumnにbuttonLinkがある場合
+			if (cleanedSection.content.textColumn?.buttonLink && typeof cleanedSection.content.textColumn.buttonLink !== 'string') {
+				cleanedSection.content.textColumn.buttonLink = '#';
+			}
+			// plansにbuttonLinkがある場合（Pricingセクション）
+			if (cleanedSection.content.plans && Array.isArray(cleanedSection.content.plans)) {
+				cleanedSection.content.plans = cleanedSection.content.plans.map((plan: any) => ({
+					...plan,
+					buttonLink: typeof plan.buttonLink === 'string' ? plan.buttonLink : '#'
+				}));
+			}
+			// teamメンバーのソーシャルリンクとavatarをクリーンアップ
+			if (cleanedSection.content.members && Array.isArray(cleanedSection.content.members)) {
+				cleanedSection.content.members = cleanedSection.content.members.map((member: any, memberIndex: number) => {
+					const cleanedMember = { ...member };
+
+					// avatarをクリーンアップ
+					if (cleanedMember.avatar && typeof cleanedMember.avatar !== 'string') {
+						console.log(`Section ${index} (${cleanedSection.type}): member[${memberIndex}].avatar is object, cleaning...`, cleanedMember.avatar);
+						cleanedMember.avatar = '';
+					}
+
+					// ソーシャルリンクをクリーンアップ
+					if (cleanedMember.social) {
+						cleanedMember.social = {
+							twitter: typeof cleanedMember.social.twitter === 'string' ? cleanedMember.social.twitter : '',
+							linkedin: typeof cleanedMember.social.linkedin === 'string' ? cleanedMember.social.linkedin : '',
+							github: typeof cleanedMember.social.github === 'string' ? cleanedMember.social.github : ''
+						};
+					}
+
+					return cleanedMember;
+				});
+			}
+			// testimonialsのavatarをクリーンアップ
+			if (cleanedSection.content.testimonials && Array.isArray(cleanedSection.content.testimonials)) {
+				cleanedSection.content.testimonials = cleanedSection.content.testimonials.map((testimonial: any, testimonialIndex: number) => {
+					if (testimonial.avatar && typeof testimonial.avatar !== 'string') {
+						console.log(`Section ${index} (${cleanedSection.type}): testimonial[${testimonialIndex}].avatar is object, cleaning...`, testimonial.avatar);
+						return {
+							...testimonial,
+							avatar: ''
+						};
+					}
+					return testimonial;
+				});
+			}
+			// galleryの画像リンクをクリーンアップ
+			if (cleanedSection.content.images && Array.isArray(cleanedSection.content.images)) {
+				cleanedSection.content.images = cleanedSection.content.images.map((img: any) => {
+					if (typeof img === 'string') {
+						return img;
+					}
+					return typeof img?.url === 'string' ? img.url : '';
+				});
+			}
+			// 2カラムセクションの画像URLをクリーンアップ
+			if (cleanedSection.content.imageColumn?.imageUrl && typeof cleanedSection.content.imageColumn.imageUrl !== 'string') {
+				console.log(`Section ${index} (${cleanedSection.type}): imageColumn.imageUrl is object, cleaning...`, cleanedSection.content.imageColumn.imageUrl);
+				cleanedSection.content.imageColumn.imageUrl = '';
+			}
+			// 2カラムセクションの動画URLをクリーンアップ
+			if (cleanedSection.content.videoColumn?.videoUrl && typeof cleanedSection.content.videoColumn.videoUrl !== 'string') {
+				console.log(`Section ${index} (${cleanedSection.type}): videoColumn.videoUrl is object, cleaning...`, cleanedSection.content.videoColumn.videoUrl);
+				cleanedSection.content.videoColumn.videoUrl = '';
+			}
+			if (cleanedSection.content.videoColumn?.thumbnail && typeof cleanedSection.content.videoColumn.thumbnail !== 'string') {
+				console.log(`Section ${index} (${cleanedSection.type}): videoColumn.thumbnail is object, cleaning...`, cleanedSection.content.videoColumn.thumbnail);
+				cleanedSection.content.videoColumn.thumbnail = '';
+			}
+			// 通常の動画URLをクリーンアップ
+			if (cleanedSection.content.videoUrl && typeof cleanedSection.content.videoUrl !== 'string') {
+				console.log(`Section ${index} (${cleanedSection.type}): videoUrl is object, cleaning...`, cleanedSection.content.videoUrl);
+				cleanedSection.content.videoUrl = '';
+			}
+			if (cleanedSection.content.thumbnail && typeof cleanedSection.content.thumbnail !== 'string') {
+				console.log(`Section ${index} (${cleanedSection.type}): thumbnail is object, cleaning...`, cleanedSection.content.thumbnail);
+				cleanedSection.content.thumbnail = '';
+			}
+			// SectionRendererで使われる画像をクリーンアップ
+			if (cleanedSection.images) {
+				if (cleanedSection.images.leftImage && typeof cleanedSection.images.leftImage !== 'string') {
+					console.log(`Section ${index} (${cleanedSection.type}): leftImage is object, cleaning...`, cleanedSection.images.leftImage);
+					cleanedSection.images.leftImage = '';
+				}
+				if (cleanedSection.images.rightImage && typeof cleanedSection.images.rightImage !== 'string') {
+					console.log(`Section ${index} (${cleanedSection.type}): rightImage is object, cleaning...`, cleanedSection.images.rightImage);
+					cleanedSection.images.rightImage = '';
+				}
+			}
+		}
+		// セクションスタイルの背景画像URLをクリーンアップ
+		if (cleanedSection.style?.backgroundImage?.url && typeof cleanedSection.style.backgroundImage.url !== 'string') {
+			console.log(`Section ${index} (${cleanedSection.type}): style.backgroundImage.url is object, cleaning...`, cleanedSection.style.backgroundImage.url);
+			cleanedSection.style.backgroundImage.url = '';
+		}
+		return cleanedSection;
+	});
 
 	// APIキー管理
-	let selectedApiKeyId = data.activeApiKey?.id || '';
 	let showApiKeyDropdown = false;
 
 	// メール設定管理
@@ -67,8 +173,7 @@
 	let expandedSections: Set<number> = new Set();
 	let expandedColorSettings: Set<number> = new Set(); // 色設定のトグル状態
 	let expandedBackgroundImageSettings: Set<number> = new Set(); // 背景画像設定のトグル状態
-	let aiChatExpanded = true; // AIチャットの折りたたみ状態
-	let columnLayout: '1-column' | '2-column' | '3-column' = '1-column'; // レイアウトタブ状態
+	let columnLayout: '1-column' | '2-column' | '3-column' | 'contact' = '1-column'; // レイアウトタブ状態
 	let fullWidthPreview = false; // 全幅プレビューモード
 	let showBulkColorSettings = false; // 一括色設定パネルの表示状態
 
@@ -285,23 +390,51 @@
 
 	// サイト情報の取得（ネストされたオブジェクトか配列かの判定）
 	$: site = Array.isArray(lp?.sites) ? lp?.sites[0] : lp?.sites;
-	$: previewUrl = (site && typeof site === 'object' && 'slug' in site && site.slug && lp?.slug)
+	$: previewUrl = (site && typeof site === 'object' && 'slug' in site && typeof site.slug === 'string' && lp?.slug && typeof lp.slug === 'string')
 		? `/WEBTHQ/${site.slug}/${lp.slug}`
 		: '#';
 
 	// セクション削除
 	function removeSection(index: number) {
+		const removedSection = sections[index];
 		sections = sections.filter((_, i) => i !== index);
+
+		// 作業履歴を記録
+		recordWorkHistory(
+			'section_deleted',
+			`${removedSection.type}セクションを削除しました`,
+			lp?.id,
+			{ sectionType: removedSection.type, sectionId: removedSection.id }
+		);
+
+		// 作業セッションにファイル変更を記録
+		if ($activeWorkSession) {
+			addChangedFile(`LP: ${lp?.title || lp?.id} - ${removedSection.type}セクション削除`);
+		}
 	}
 
 	// セクション移動
 	function moveSection(index: number, direction: 'up' | 'down') {
+		const section = sections[index];
 		if (direction === 'up' && index > 0) {
 			[sections[index - 1], sections[index]] = [sections[index], sections[index - 1]];
 		} else if (direction === 'down' && index < sections.length - 1) {
 			[sections[index], sections[index + 1]] = [sections[index + 1], sections[index]];
 		}
 		sections = sections;
+
+		// 作業履歴を記録
+		recordWorkHistory(
+			'section_reordered',
+			`${section.type}セクションを${direction === 'up' ? '上' : '下'}に移動しました`,
+			lp?.id,
+			{ sectionType: section.type, sectionId: section.id, direction }
+		);
+
+		// 作業セッションにファイル変更を記録
+		if ($activeWorkSession) {
+			addChangedFile(`LP: ${lp?.title || lp?.id} - セクション並び替え`);
+		}
 	}
 
 	// 手動でセクション追加
@@ -334,6 +467,19 @@
 			content: getDefaultContent(type)
 		};
 		sections = [...sections, newSection];
+
+		// 作業履歴を記録
+		recordWorkHistory(
+			'section_added',
+			`${type}セクションを追加しました`,
+			lp?.id,
+			{ sectionType: type, sectionId: newSection.id }
+		);
+
+		// 作業セッションにファイル変更を記録
+		if ($activeWorkSession) {
+			addChangedFile(`LP: ${lp?.title || lp?.id} - ${type}セクション追加`);
+		}
 	}
 
 	function getDefaultContent(type: string) {
@@ -624,7 +770,31 @@
 	// 保存
 	async function saveContent() {
 		saving = true;
-		const contentData: PageContent = { sections };
+
+		// buttonLinkを安全に文字列に変換
+		const cleanedSections = sections.map(section => {
+			const cleanedSection = { ...section };
+			if (cleanedSection.content) {
+				// 直接buttonLinkがある場合
+				if (cleanedSection.content.buttonLink && typeof cleanedSection.content.buttonLink !== 'string') {
+					cleanedSection.content.buttonLink = '#';
+				}
+				// textColumnにbuttonLinkがある場合
+				if (cleanedSection.content.textColumn?.buttonLink && typeof cleanedSection.content.textColumn.buttonLink !== 'string') {
+					cleanedSection.content.textColumn.buttonLink = '#';
+				}
+				// plansにbuttonLinkがある場合（Pricingセクション）
+				if (cleanedSection.content.plans && Array.isArray(cleanedSection.content.plans)) {
+					cleanedSection.content.plans = cleanedSection.content.plans.map((plan: any) => ({
+						...plan,
+						buttonLink: typeof plan.buttonLink === 'string' ? plan.buttonLink : '#'
+					}));
+				}
+			}
+			return cleanedSection;
+		});
+
+		const contentData: PageContent = { sections: cleanedSections };
 		const formData = new FormData();
 		formData.append('content', JSON.stringify(contentData));
 
@@ -636,6 +806,19 @@
 		saving = false;
 		if (response.ok) {
 			showNotification('保存しました', 'success');
+
+			// 作業履歴を記録
+			recordWorkHistory(
+				'content_saved',
+				`LPコンテンツを保存しました（${sections.length}セクション）`,
+				lp?.id,
+				{ sectionCount: sections.length }
+			);
+
+			// 作業セッションにファイル変更を記録
+			if ($activeWorkSession) {
+				addChangedFile(`src/routes/dashboard/landing-pages/${lp?.id}/edit`);
+			}
 		} else {
 			showNotification('保存に失敗しました', 'error');
 		}
@@ -1598,7 +1781,10 @@
 																				{#each sections.filter(s => (s.type === 'contact' || s.type === 'two_column_text_contact' || s.type === 'two_column_contact_image')) as contactSection, idx}
 																					{@const title = contactSection.content.formName || contactSection.content.contactColumn?.formName || contactSection.content.title || contactSection.content.textColumn?.title || 'お問い合わせ'}
 																					{@const isInline = !contactSection.content.useDedicatedPage && !contactSection.content.contactColumn?.useDedicatedPage}
-																					<option value={isInline ? `#${contactSection.id}` : `/WEBTHQ/${lp?.site_slug || 'site'}/${lp?.slug || 'lp'}/contact`}>
+																					{@const siteSlug = typeof site?.slug === 'string' ? site.slug : 'site'}
+																					{@const lpSlug = typeof lp?.slug === 'string' ? lp.slug : 'lp'}
+																					{@const sectionId = typeof contactSection.id === 'string' ? contactSection.id : ''}
+																					<option value={isInline ? `#${sectionId}` : `/WEBTHQ/${siteSlug}/${lpSlug}/contact`}>
 																						{title} {isInline ? '(ページ内)' : '(専用ページ)'}
 																					</option>
 																				{/each}
@@ -1767,7 +1953,10 @@
 																	{#each sections.filter(s => (s.type === 'contact' || s.type === 'two_column_text_contact' || s.type === 'two_column_contact_image')) as contactSection, idx}
 																		{@const title = contactSection.content.formName || contactSection.content.contactColumn?.formName || contactSection.content.title || contactSection.content.textColumn?.title || 'お問い合わせ'}
 																		{@const isInline = !contactSection.content.useDedicatedPage && !contactSection.content.contactColumn?.useDedicatedPage}
-																		<option value={isInline ? `#${contactSection.id}` : `/WEBTHQ/${lp?.site_slug || 'site'}/${lp?.slug || 'lp'}/contact`}>
+																		{@const siteSlug = typeof site?.slug === 'string' ? site.slug : 'site'}
+																		{@const lpSlug = typeof lp?.slug === 'string' ? lp.slug : 'lp'}
+																		{@const sectionId = typeof contactSection.id === 'string' ? contactSection.id : ''}
+																		<option value={isInline ? `#${sectionId}` : `/WEBTHQ/${siteSlug}/${lpSlug}/contact`}>
 																			{title} {isInline ? '(ページ内)' : '(専用ページ)'}
 																		</option>
 																	{/each}
@@ -2370,7 +2559,10 @@
 																				{#each sections.filter(s => (s.type === 'contact' || s.type === 'two_column_text_contact' || s.type === 'two_column_contact_image')) as contactSection}
 																					{@const title = contactSection.content.formName || contactSection.content.contactColumn?.formName || contactSection.content.title || contactSection.content.textColumn?.title || 'お問い合わせ'}
 																					{@const isInline = !contactSection.content.useDedicatedPage && !contactSection.content.contactColumn?.useDedicatedPage}
-																					<option value={isInline ? `#${contactSection.id}` : `/WEBTHQ/${lp?.site_slug || 'site'}/${lp?.slug || 'lp'}/contact`}>
+																					{@const siteSlug = typeof site?.slug === 'string' ? site.slug : 'site'}
+																					{@const lpSlug = typeof lp?.slug === 'string' ? lp.slug : 'lp'}
+																					{@const sectionId = typeof contactSection.id === 'string' ? contactSection.id : ''}
+																					<option value={isInline ? `#${sectionId}` : `/WEBTHQ/${siteSlug}/${lpSlug}/contact`}>
 																						{title} {isInline ? '(ページ内)' : '(専用ページ)'}
 																					</option>
 																				{/each}
@@ -2780,7 +2972,10 @@
 																				{#each sections.filter(s => (s.type === 'contact' || s.type === 'two_column_text_contact' || s.type === 'two_column_contact_image')) as contactSection}
 																					{@const title = contactSection.content.formName || contactSection.content.contactColumn?.formName || contactSection.content.title || contactSection.content.textColumn?.title || 'お問い合わせ'}
 																					{@const isInline = !contactSection.content.useDedicatedPage && !contactSection.content.contactColumn?.useDedicatedPage}
-																					<option value={isInline ? `#${contactSection.id}` : `/WEBTHQ/${lp?.site_slug || 'site'}/${lp?.slug || 'lp'}/contact`}>
+																					{@const siteSlug = typeof site?.slug === 'string' ? site.slug : 'site'}
+																					{@const lpSlug = typeof lp?.slug === 'string' ? lp.slug : 'lp'}
+																					{@const sectionId = typeof contactSection.id === 'string' ? contactSection.id : ''}
+																					<option value={isInline ? `#${sectionId}` : `/WEBTHQ/${siteSlug}/${lpSlug}/contact`}>
 																						{title} {isInline ? '(ページ内)' : '(専用ページ)'}
 																					</option>
 																				{/each}
@@ -3091,7 +3286,10 @@
 																				{#each sections.filter(s => (s.type === 'contact' || s.type === 'two_column_text_contact' || s.type === 'two_column_contact_image')) as contactSection}
 																					{@const title = contactSection.content.formName || contactSection.content.contactColumn?.formName || contactSection.content.title || contactSection.content.textColumn?.title || 'お問い合わせ'}
 																					{@const isInline = !contactSection.content.useDedicatedPage && !contactSection.content.contactColumn?.useDedicatedPage}
-																					<option value={isInline ? `#${contactSection.id}` : `/WEBTHQ/${lp?.site_slug || 'site'}/${lp?.slug || 'lp'}/contact`}>
+																					{@const siteSlug = typeof site?.slug === 'string' ? site.slug : 'site'}
+																					{@const lpSlug = typeof lp?.slug === 'string' ? lp.slug : 'lp'}
+																					{@const sectionId = typeof contactSection.id === 'string' ? contactSection.id : ''}
+																					<option value={isInline ? `#${sectionId}` : `/WEBTHQ/${siteSlug}/${lpSlug}/contact`}>
 																						{title} {isInline ? '(ページ内)' : '(専用ページ)'}
 																					</option>
 																				{/each}
@@ -3767,6 +3965,15 @@
 							<Columns3 size={18} />
 							<span>3カラム</span>
 						</button>
+						<button
+							on:click={() => (columnLayout = 'contact')}
+							class="flex items-center gap-2 px-4 py-2 transition {columnLayout === 'contact'
+								? 'text-pink-600 border-b-2 border-pink-600 font-semibold'
+								: 'text-gray-600 hover:text-gray-900'}"
+						>
+							<Mail size={18} />
+							<span>問い合わせ</span>
+						</button>
 					</div>
 
 					<!-- 1カラムセクションボタン -->
@@ -3792,13 +3999,6 @@
 						>
 							<Megaphone size={24} class="mb-1" />
 							<span class="text-sm font-semibold">CTA</span>
-						</button>
-						<button
-							on:click={() => addSection('contact')}
-							class="flex flex-col items-center justify-center px-4 py-3 bg-white border-2 border-purple-200 text-purple-700 rounded-lg hover:bg-purple-50 transition"
-						>
-							<Mail size={24} class="mb-1" />
-							<span class="text-sm font-semibold">お問い合わせ</span>
 						</button>
 						<button
 							on:click={() => addSection('pricing')}
@@ -3911,37 +4111,49 @@
 						<Columns3 size={48} class="mx-auto mb-2 text-gray-400" />
 						<p class="text-sm">3カラムセクションは今後実装予定です</p>
 					</div>
-					{/if}
-				</div>
 
-				<!-- AI Chat Interface -->
-				<div class="space-y-4">
-					<div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg overflow-hidden">
-						<!-- AIチャットヘッダー -->
-						<button
-							on:click={() => (aiChatExpanded = !aiChatExpanded)}
-							class="w-full px-4 py-3 flex items-center justify-between hover:bg-purple-100 transition"
-						>
-							<div class="flex items-center gap-2">
-								<Bot size={24} class="text-purple-600" />
-								<span class="font-semibold text-gray-800">AIアシスタント</span>
-							</div>
-							<ChevronDown
-								size={20}
-								class="text-gray-400 transition-transform {aiChatExpanded ? 'rotate-180' : ''}"
-							/>
-						</button>
-
-						<!-- AIチャット本体 -->
-						{#if aiChatExpanded}
-							<div class="border-t border-purple-200 bg-white p-4">
-								<p class="text-sm text-gray-600 mb-4">
-									AIに指示を出してページを編集できます。例: 「ヒーローセクションを追加して」
-								</p>
-								<AIChat landingPageId={lp?.id} bind:sections apiKeyId={selectedApiKeyId} />
-							</div>
-						{/if}
+					<!-- 問い合わせセクションボタン -->
+					{:else if columnLayout === 'contact'}
+					<div class="space-y-4">
+						<div class="grid grid-cols-2 gap-3">
+							<button
+								on:click={() => addSection('contact')}
+								class="flex flex-col items-center justify-center px-4 py-6 bg-white border-2 border-purple-200 text-purple-700 rounded-lg hover:bg-purple-50 transition"
+							>
+								<Mail size={32} class="mb-2" />
+								<span class="text-sm font-semibold">お問い合わせ</span>
+								<span class="text-xs text-gray-500 mt-1">1カラム</span>
+							</button>
+							<button
+								on:click={() => addSection('two_column_text_contact')}
+								class="flex flex-col items-center justify-center px-4 py-6 bg-white border-2 border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition"
+							>
+								<div class="flex items-center gap-1 mb-2">
+									<FileText size={24} />
+									<Mail size={24} />
+								</div>
+								<span class="text-sm font-semibold">テキスト + 問い合わせ</span>
+								<span class="text-xs text-gray-500 mt-1">2カラム</span>
+							</button>
+							<button
+								on:click={() => addSection('two_column_contact_image')}
+								class="flex flex-col items-center justify-center px-4 py-6 bg-white border-2 border-green-200 text-green-700 rounded-lg hover:bg-green-50 transition"
+							>
+								<div class="flex items-center gap-1 mb-2">
+									<Mail size={24} />
+									<ImageIcon size={24} />
+								</div>
+								<span class="text-sm font-semibold">問い合わせ + 画像</span>
+								<span class="text-xs text-gray-500 mt-1">2カラム</span>
+							</button>
+						</div>
+						<div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+							<p class="text-sm text-purple-800">
+								<strong>ヒント:</strong> 問い合わせフォームは顧客とのコミュニケーションの重要なポイントです。適切な配置とデザインで、より多くのお問い合わせを獲得できます。
+							</p>
+						</div>
 					</div>
+					{/if}
 				</div>
 
 				<!-- Image Gallery -->
@@ -4024,10 +4236,10 @@
 						{/if}
 					</div>
 				{:else if leftPanelTab === 'source'}
-					<!-- ソースコード（セクション毎） -->
-					<div class="p-6 h-full bg-gray-900 overflow-y-auto">
+					<!-- ソースコード -->
+					<div class="p-6 h-full bg-gray-900">
 						<div class="mb-6">
-							<h3 class="text-lg font-semibold text-white">セクション別ソースコード</h3>
+							<h3 class="text-lg font-semibold text-white">ソースコード編集</h3>
 							<p class="text-xs text-gray-400 mt-1">各セクションのcontentとstyleをJSON形式で編集できます</p>
 						</div>
 
@@ -4115,7 +4327,7 @@
 													<li>contentとstyleのみ編集可能です</li>
 													<li>type, id, orderは変更できません</li>
 													<li>正しいJSON形式で入力してください</li>
-													<li>保存後、プレビューで確認できます</li>
+													<li>保存後、プレビュータブで確認できます</li>
 												</ul>
 											</div>
 										</div>

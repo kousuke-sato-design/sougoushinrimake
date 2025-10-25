@@ -226,8 +226,15 @@
 									<p class="text-gray-700 font-medium">フォーム項目: {template.fields.length}個</p>
 									<div class="flex flex-wrap gap-2 mt-2">
 										{#each template.fields as field}
-											<span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
-												{field.label}
+											<span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded flex items-center gap-1">
+												<span class="font-medium">{field.label}</span>
+												{#if field.type === 'select'}
+													<span class="text-blue-600">(選択)</span>
+												{:else if field.type === 'radio'}
+													<span class="text-purple-600">(ラジオ)</span>
+												{:else if field.type === 'textarea'}
+													<span class="text-gray-500">(複数行)</span>
+												{/if}
 												{#if field.required}
 													<span class="text-red-500">*</span>
 												{/if}
@@ -360,12 +367,20 @@
 											<label class="block text-xs font-medium text-gray-600 mb-1">タイプ</label>
 											<select
 												bind:value={field.type}
+												on:change={() => {
+													// select/radioタイプに変更した場合、optionsを初期化
+													if ((field.type === 'select' || field.type === 'radio') && !field.options) {
+														field.options = ['選択肢1', '選択肢2'];
+													}
+												}}
 												class="w-full px-2 py-1.5 border rounded text-sm"
 											>
 												<option value="text">テキスト</option>
 												<option value="email">メール</option>
 												<option value="tel">電話</option>
 												<option value="textarea">複数行</option>
+												<option value="select">プルダウン選択</option>
+												<option value="radio">ラジオボタン</option>
 											</select>
 										</div>
 									</div>
@@ -389,6 +404,48 @@
 											/>
 										</div>
 									</div>
+
+									<!-- 選択肢編集（select/radioの場合のみ表示） -->
+									{#if field.type === 'select' || field.type === 'radio'}
+										<div class="mb-2 p-2 bg-blue-50 border border-blue-200 rounded">
+											<div class="flex items-center justify-between mb-2">
+												<label class="block text-xs font-semibold text-blue-900">選択肢</label>
+												<button
+													type="button"
+													on:click={() => {
+														if (!field.options) field.options = [];
+														field.options = [...field.options, '新しい選択肢'];
+														formData.fields = formData.fields; // リアクティブ更新
+													}}
+													class="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition"
+												>
+													+ 追加
+												</button>
+											</div>
+											<div class="space-y-1.5">
+												{#each field.options || [] as option, optionIndex}
+													<div class="flex gap-2">
+														<input
+															type="text"
+															bind:value={field.options[optionIndex]}
+															placeholder="選択肢{optionIndex + 1}"
+															class="flex-1 px-2 py-1 border border-blue-300 rounded text-xs"
+														/>
+														<button
+															type="button"
+															on:click={() => {
+																field.options = field.options?.filter((_, i) => i !== optionIndex);
+																formData.fields = formData.fields; // リアクティブ更新
+															}}
+															class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition"
+														>
+															削除
+														</button>
+													</div>
+												{/each}
+											</div>
+										</div>
+									{/if}
 									<div class="flex items-center justify-between">
 										<label class="flex items-center gap-2 cursor-pointer">
 											<input

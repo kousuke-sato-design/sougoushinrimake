@@ -61,7 +61,7 @@
 				{#if section.content.textColumn.buttonText}
 					<div class="pt-4">
 						<a
-							href={section.content.textColumn.buttonLink || '#'}
+							href={typeof section.content.textColumn.buttonLink === 'string' ? section.content.textColumn.buttonLink : '#'}
 							class="inline-block px-8 py-3 bg-pink-600 text-white font-semibold rounded-lg hover:bg-pink-700 transition"
 						>
 							{section.content.textColumn.buttonText}
@@ -73,11 +73,11 @@
 			<!-- 動画カラム -->
 			<div class="rounded-lg overflow-hidden shadow-xl bg-gray-900 aspect-video">
 				{#if section.content.videoColumn.videoType === 'direct'}
-					<video controls class="w-full h-full" poster={section.content.videoColumn.thumbnail}>
-						<source src={section.content.videoColumn.videoUrl} type="video/mp4" />
+					<video controls class="w-full h-full" poster={typeof section.content.videoColumn.thumbnail === 'string' ? section.content.videoColumn.thumbnail : ''}>
+						<source src={typeof section.content.videoColumn.videoUrl === 'string' ? section.content.videoColumn.videoUrl : ''} type="video/mp4" />
 						お使いのブラウザは動画タグに対応していません。
 					</video>
-				{:else}
+				{:else if typeof section.content.videoColumn.videoUrl === 'string'}
 					<iframe
 						src={embedUrl}
 						title="動画"

@@ -38,7 +38,7 @@
 					<p class="text-gray-700 mb-6 italic">{testimonial.content}</p>
 
 					<div class="flex items-center gap-4">
-						{#if testimonial.avatar}
+						{#if testimonial.avatar && typeof testimonial.avatar === 'string'}
 							<img
 								src={testimonial.avatar}
 								alt={testimonial.name}

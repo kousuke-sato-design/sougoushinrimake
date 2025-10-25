@@ -35,12 +35,12 @@
 
 		<div class="relative aspect-video rounded-lg overflow-hidden shadow-2xl">
 			{#if content.videoType === 'direct'}
-				<video controls class="w-full h-full" poster={content.thumbnail}>
-					<source src={content.videoUrl} type="video/mp4" />
+				<video controls class="w-full h-full" poster={typeof content.thumbnail === 'string' ? content.thumbnail : ''}>
+					<source src={typeof content.videoUrl === 'string' ? content.videoUrl : ''} type="video/mp4" />
 					<track kind="captions" />
 					お使いのブラウザは動画タグをサポートしていません。
 				</video>
-			{:else}
+			{:else if typeof content.videoUrl === 'string'}
 				<iframe
 					src={getEmbedUrl(content.videoUrl, content.videoType)}
 					title={content.title || 'Video'}

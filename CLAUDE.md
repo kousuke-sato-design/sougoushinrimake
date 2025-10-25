@@ -276,3 +276,78 @@ async function saveSectionSource(index: number) {
 - AI機能: 1〜2週間 ✅
 - 機能拡張: 1〜2週間 🚧
 - **合計: 4〜7週間**
+
+---
+
+## Claude Code作業履歴記録ルール ⭐ **重要**
+
+### 自動記録の仕組み
+
+Claude Codeで作業する際は、**必ず**以下のルールに従って作業履歴を記録すること:
+
+#### 1. 作業セッション開始時（必須）
+```javascript
+import { startWorkSession } from '$lib/utils/workSession';
+
+// 作業開始時に必ず実行
+await startWorkSession();
+```
+
+#### 2. ソースコード変更時（必須）
+- ソースコードを変更した場合、**必ず**簡潔な日本語で作業内容を記録
+- 変更したファイルのパスも記録
+
+```javascript
+import { recordWorkDescription } from '$lib/utils/workSession';
+
+// ファイル変更後に実行
+await recordWorkDescription(
+  "問い合わせフォームの専用タブを追加し、セクション挿入UIを改善",
+  [
+    "src/routes/dashboard/landing-pages/[id]/edit/+page.svelte",
+    "src/lib/components/WorkHistory.svelte"
+  ]
+);
+```
+
+#### 3. 作業セッション終了時（必須）
+```javascript
+import { endWorkSession } from '$lib/utils/workSession';
+
+// 作業終了時に必ず実行
+await endWorkSession("本日の作業完了");
+```
+
+### 記録すべき情報
+
+1. **作業日付**: 自動記録
+2. **作業時間**: 開始〜終了時刻から自動計算
+3. **作業内容**: 日本語で簡潔に記述（例: 「セクション追加機能を実装」「バグ修正」）
+4. **変更ファイル**: 変更したファイルのパスリスト
+
+### 作業履歴の確認方法
+
+- サイドバーの「作業履歴」メニューから確認
+- 日付ごとにグループ化され、合計作業時間も表示される
+
+### 注意事項
+
+- **ソースコード変更がない場合は記録不要**
+- 単なる閲覧、検索、ファイル読み込みは記録しない
+- 実際にファイルを編集・作成・削除した場合のみ記録
+- 作業内容は具体的かつ簡潔に（例: 「○○機能を追加」「○○のバグを修正」）
+
+### データベーススキーマ
+
+```sql
+CREATE TABLE work_sessions (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id),
+  session_date DATE,           -- 作業日
+  start_time TIMESTAMPTZ,      -- 開始時刻
+  end_time TIMESTAMPTZ,        -- 終了時刻
+  duration_minutes INTEGER,    -- 作業時間（分）
+  description TEXT,            -- 作業内容
+  changes JSONB               -- 変更ファイルリスト
+);
+```

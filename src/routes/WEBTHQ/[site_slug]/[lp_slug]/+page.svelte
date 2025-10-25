@@ -38,7 +38,7 @@
 		</div>
 	{:else}
 		{#each sections as section}
-			<SectionRenderer {section} />
+			<SectionRenderer {section} landingPageId={data.landingPage.id} />
 		{/each}
 	{/if}
 </div>

@@ -27,7 +27,7 @@
 
 			{#if content.buttonText && content.buttonLink}
 				<a
-					href={content.buttonLink}
+					href={typeof content.buttonLink === 'string' ? content.buttonLink : '#'}
 					class="inline-block px-10 py-4 bg-white text-blue-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition shadow-xl"
 				>
 					{content.buttonText}
