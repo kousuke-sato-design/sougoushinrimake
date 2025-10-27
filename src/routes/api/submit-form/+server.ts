@@ -136,14 +136,29 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					};
 
 					// メール送信
+					const fromEmail = `${imapAccount.from_name || ''} <${imapAccount.email}>`;
 					await sendEmail(smtpConfig, {
 						to: customerData.email,
 						subject,
 						html: body,
-						from: `${imapAccount.from_name || ''} <${imapAccount.email}>`
+						from: fromEmail
 					});
 
 					console.log('Auto-reply email sent to:', customerData.email);
+
+					// メール送信ログを保存
+					await locals.supabase.from('email_logs').insert({
+						email_type: 'auto_reply',
+						user_id: lpData.user_id,
+						customer_id: customer.id,
+						email_setting_id: autoReplyEmailSettingId,
+						subject,
+						body,
+						to_email: customerData.email,
+						from_email: imapAccount.email,
+						status: 'sent',
+						sent_at: new Date().toISOString()
+					});
 				}
 			} catch (emailError) {
 				console.error('Auto-reply email error:', emailError);

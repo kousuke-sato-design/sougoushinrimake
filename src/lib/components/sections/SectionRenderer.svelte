@@ -18,6 +18,7 @@
 	import TwoColumnFeaturesImageSection from './TwoColumnFeaturesImageSection.svelte';
 	import TwoColumnTextContactSection from './TwoColumnTextContactSection.svelte';
 	import TwoColumnContactImageSection from './TwoColumnContactImageSection.svelte';
+	import TwoColumnImageContactSection from './TwoColumnImageContactSection.svelte';
 
 	export let section: Section;
 	export let landingPageId: string = '';
@@ -206,6 +207,8 @@
 				<TwoColumnTextContactSection {section} {landingPageId} />
 			{:else if section.type === 'two_column_contact_image'}
 				<TwoColumnContactImageSection {section} {landingPageId} />
+			{:else if section.type === 'two_column_image_contact'}
+				<TwoColumnImageContactSection {section} {landingPageId} />
 			{:else if section.type === 'custom'}
 				<div class="py-16">
 					{@html section.content.html}

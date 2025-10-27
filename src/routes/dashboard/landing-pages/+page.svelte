@@ -199,11 +199,19 @@
 							>
 								編集
 							</a>
-							<button
-								class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
-							>
-								⋯
-							</button>
+							<form method="POST" action="?/deleteLP" class="flex-1" use:enhance on:submit={(e) => {
+								if (!confirm('本当にこのLPを削除しますか？この操作は取り消せません。')) {
+									e.preventDefault();
+								}
+							}}>
+								<input type="hidden" name="lp_id" value={lp.id} />
+								<button
+									type="submit"
+									class="w-full px-4 py-2 bg-red-600 text-white text-center rounded-lg text-sm font-medium hover:bg-red-700 transition"
+								>
+									削除
+								</button>
+							</form>
 						</div>
 					</div>
 				</div>

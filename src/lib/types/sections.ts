@@ -395,11 +395,45 @@ export interface TwoColumnContactImageSection extends BaseSection {
 			submitButtonText: string;
 			useDedicatedPage?: boolean;
 			dedicatedPageButtonText?: string;
+			autoReplyEnabled?: boolean;
+			autoReplyEmailSettingId?: string;
 		};
 		imageColumn: {
 			imageUrl: string;
 			imageAlt: string;
 			caption?: string;
+		};
+		layout: {
+			ratio: '50-50' | '60-40' | '40-60';
+		};
+	};
+}
+
+export interface TwoColumnImageContactSection extends BaseSection {
+	type: 'two_column_image_contact';
+	content: {
+		imageColumn: {
+			textContent: {
+				title: string;
+				description: string;
+			};
+			imageUrl: string;
+			imageAlt: string;
+			caption?: string;
+		};
+		contactColumn: {
+			formFields?: Array<{
+				name: string;
+				label: string;
+				type: 'text' | 'email' | 'tel' | 'textarea';
+				required: boolean;
+				placeholder?: string;
+			}>;
+			submitButtonText: string;
+			useDedicatedPage?: boolean;
+			dedicatedPageButtonText?: string;
+			autoReplyEnabled?: boolean;
+			autoReplyEmailSettingId?: string;
 		};
 		layout: {
 			ratio: '50-50' | '60-40' | '40-60';
@@ -427,7 +461,8 @@ export type Section =
 	| TwoColumnTextVideoSection
 	| TwoColumnFeaturesImageSection
 	| TwoColumnTextContactSection
-	| TwoColumnContactImageSection;
+	| TwoColumnContactImageSection
+	| TwoColumnImageContactSection;
 
 export interface PageContent {
 	sections: Section[];

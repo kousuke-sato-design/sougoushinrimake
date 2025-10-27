@@ -9,8 +9,13 @@
 	let showAddModal = false;
 	let showEditModal = false;
 	let showImportModal = false;
+	let showDetailsModal = false;
 	let editingCustomer: any = null;
+	let selectedCustomer: any = null;
 	let csvData = '';
+	let emailLogs: any[] = [];
+	let loadingEmailLogs = false;
+	let activeTab: 'info' | 'emails' = 'info';
 
 	// ステータスの日本語表示
 	function getStatusLabel(status: string) {
@@ -74,7 +79,31 @@
 		showAddModal = false;
 		showEditModal = false;
 		showImportModal = false;
+		showDetailsModal = false;
 		editingCustomer = null;
+		selectedCustomer = null;
+	}
+
+	// 詳細モーダルを開く
+	async function openDetailsModal(customer: any) {
+		selectedCustomer = customer;
+		showDetailsModal = true;
+		activeTab = 'info';
+		emailLogs = [];
+
+		// メール履歴を読み込み
+		loadingEmailLogs = true;
+		try {
+			const response = await fetch(`/api/customers/${customer.id}/email-logs`);
+			if (response.ok) {
+				const data = await response.json();
+				emailLogs = data.emailLogs || [];
+			}
+		} catch (err) {
+			console.error('Error loading email logs:', err);
+		} finally {
+			loadingEmailLogs = false;
+		}
 	}
 
 	// 削除確認
@@ -182,6 +211,9 @@
 							送信元
 						</th>
 						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+							問い合わせ
+						</th>
+						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
 							ステータス
 						</th>
 						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -213,6 +245,18 @@
 											フォーム: {customer.custom_fields._meta.form_template_name}
 										</div>
 									{/if}
+								{:else}
+									<span class="text-gray-400">-</span>
+								{/if}
+							</td>
+							<td class="px-6 py-4 text-sm">
+								{#if customer.custom_fields && Object.keys(customer.custom_fields).filter(k => k !== '_meta').length > 0}
+									<button
+										on:click={() => openDetailsModal(customer)}
+										class="text-blue-600 hover:text-blue-800 underline"
+									>
+										詳細を見る
+									</button>
 								{:else}
 									<span class="text-gray-400">-</span>
 								{/if}
@@ -476,6 +520,208 @@
 					</button>
 				</div>
 			</form>
+		</div>
+	</div>
+{/if}
+
+<!-- 問い合わせ詳細モーダル -->
+{#if showDetailsModal && selectedCustomer}
+	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+		<div class="bg-white rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+			<h3 class="text-xl font-semibold text-gray-800 mb-4">顧客詳細</h3>
+
+			<!-- タブナビゲーション -->
+			<div class="flex border-b border-gray-200 mb-4">
+				<button
+					class="px-4 py-2 font-medium text-sm transition {activeTab === 'info'
+						? 'border-b-2 border-blue-600 text-blue-600'
+						: 'text-gray-600 hover:text-gray-800'}"
+					on:click={() => (activeTab = 'info')}
+				>
+					基本情報
+				</button>
+				<button
+					class="px-4 py-2 font-medium text-sm transition {activeTab === 'emails'
+						? 'border-b-2 border-blue-600 text-blue-600'
+						: 'text-gray-600 hover:text-gray-800'}"
+					on:click={() => (activeTab = 'emails')}
+				>
+					メール履歴 {#if emailLogs.length > 0}<span class="ml-1 text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">{emailLogs.length}</span>{/if}
+				</button>
+			</div>
+
+			<!-- タブコンテンツ -->
+			{#if activeTab === 'info'}
+			<!-- 基本情報 -->
+			<div class="mb-6 p-4 bg-gray-50 rounded-lg">
+				<h4 class="font-semibold text-gray-700 mb-3">顧客情報</h4>
+				<div class="grid grid-cols-2 gap-4 text-sm">
+					<div>
+						<span class="text-gray-600">名前:</span>
+						<span class="ml-2 font-medium">{selectedCustomer.name}</span>
+					</div>
+					<div>
+						<span class="text-gray-600">メール:</span>
+						<span class="ml-2 font-medium">{selectedCustomer.email}</span>
+					</div>
+					{#if selectedCustomer.company}
+						<div>
+							<span class="text-gray-600">会社名:</span>
+							<span class="ml-2 font-medium">{selectedCustomer.company}</span>
+						</div>
+					{/if}
+					{#if selectedCustomer.position}
+						<div>
+							<span class="text-gray-600">役職:</span>
+							<span class="ml-2 font-medium">{selectedCustomer.position}</span>
+						</div>
+					{/if}
+					{#if selectedCustomer.phone}
+						<div>
+							<span class="text-gray-600">電話:</span>
+							<span class="ml-2 font-medium">{selectedCustomer.phone}</span>
+						</div>
+					{/if}
+					<div>
+						<span class="text-gray-600">登録日:</span>
+						<span class="ml-2 font-medium">{formatDate(selectedCustomer.created_at)}</span>
+					</div>
+				</div>
+			</div>
+
+			<!-- 問い合わせ内容 -->
+			{#if selectedCustomer.custom_fields}
+				<div class="mb-4">
+					<h4 class="font-semibold text-gray-700 mb-3">問い合わせ内容</h4>
+					<div class="space-y-3">
+						{#each Object.entries(selectedCustomer.custom_fields) as [key, value]}
+							{#if key !== '_meta'}
+								<div class="p-3 bg-gray-50 rounded-lg">
+									<div class="text-sm font-medium text-gray-700 mb-1">
+										{key.replace(/_/g, ' ')}
+									</div>
+									<div class="text-sm text-gray-900 whitespace-pre-wrap">
+										{value || '-'}
+									</div>
+								</div>
+							{/if}
+						{/each}
+					</div>
+				</div>
+
+				<!-- フォームテンプレート情報 -->
+				{#if selectedCustomer.custom_fields._meta?.form_template_name}
+					<div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+						<div class="text-xs text-blue-600 font-medium">
+							使用フォーム: {selectedCustomer.custom_fields._meta.form_template_name}
+						</div>
+					</div>
+				{/if}
+			{/if}
+
+			<!-- 送信元LP情報 -->
+			{#if selectedCustomer.landing_pages}
+				<div class="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
+					<div class="text-xs text-green-600 font-medium">
+						送信元LP: {selectedCustomer.landing_pages.title}
+					</div>
+				</div>
+			{/if}
+			{:else if activeTab === 'emails'}
+			<!-- メール履歴 -->
+			<div class="space-y-4">
+				{#if loadingEmailLogs}
+					<div class="text-center py-8 text-gray-500">
+						<div class="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+						<p>メール履歴を読み込み中...</p>
+					</div>
+				{:else if emailLogs.length === 0}
+					<div class="text-center py-8 text-gray-500">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-2 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+						</svg>
+						<p>まだメール履歴がありません</p>
+					</div>
+				{:else}
+					{#each emailLogs as log}
+						<div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+							<!-- ヘッダー -->
+							<div class="flex items-start justify-between mb-3">
+								<div class="flex-1">
+									<div class="flex items-center gap-2 mb-1">
+										<span class="inline-block px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded">
+											自動返信
+										</span>
+										{#if log.email_settings}
+											<span class="text-xs text-gray-500">
+												{log.email_settings.name}
+											</span>
+										{/if}
+									</div>
+									<div class="text-sm font-semibold text-gray-800">
+										{log.subject}
+									</div>
+								</div>
+								<div class="text-xs text-gray-500">
+									{new Date(log.sent_at).toLocaleString('ja-JP', {
+										year: 'numeric',
+										month: '2-digit',
+										day: '2-digit',
+										hour: '2-digit',
+										minute: '2-digit'
+									})}
+								</div>
+							</div>
+
+							<!-- 送信先 -->
+							<div class="text-xs text-gray-600 mb-3">
+								<span class="font-medium">To:</span> {log.to_email}
+							</div>
+
+							<!-- ステータス -->
+							<div class="flex items-center gap-2">
+								<span class="inline-flex items-center px-2 py-1 text-xs rounded {log.status === 'sent'
+										? 'bg-blue-100 text-blue-700'
+										: log.status === 'delivered'
+											? 'bg-green-100 text-green-700'
+											: log.status === 'failed'
+												? 'bg-red-100 text-red-700'
+												: 'bg-gray-100 text-gray-700'}">
+									{log.status === 'sent'
+										? '送信済み'
+										: log.status === 'delivered'
+											? '配信済み'
+											: log.status === 'failed'
+												? '失敗'
+												: log.status}
+								</span>
+							</div>
+
+							<!-- 本文プレビュー（折りたたみ可能） -->
+							<details class="mt-3">
+								<summary class="cursor-pointer text-xs text-blue-600 hover:text-blue-800 font-medium">
+									メール本文を表示
+								</summary>
+								<div class="mt-2 p-3 bg-gray-50 rounded text-sm text-gray-700 max-h-60 overflow-y-auto">
+									{@html log.body || '-'}
+								</div>
+							</details>
+						</div>
+					{/each}
+				{/if}
+			</div>
+			{/if}
+
+			<!-- 閉じるボタン -->
+			<div class="flex justify-end pt-4">
+				<button
+					type="button"
+					on:click={closeModals}
+					class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+				>
+					閉じる
+				</button>
+			</div>
 		</div>
 	</div>
 {/if}

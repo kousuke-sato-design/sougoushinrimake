@@ -131,7 +131,7 @@ export const benefitPageTemplate: LPTemplate = {
 export const whitepaperTemplate: LPTemplate = {
 	id: 'whitepaper-basic',
 	name: 'ホワイトペーパー（基本テンプレート）',
-	description: 'ヒーロー、資料内容、ダウンロードフォームを含むホワイトペーパーダウンロードページテンプレート',
+	description: 'ヒーロー、資料内容、2カラム問い合わせフォームを含むホワイトペーパーダウンロードページテンプレート',
 	lpType: 'whitepaper',
 	sections: [
 		{
@@ -141,9 +141,7 @@ export const whitepaperTemplate: LPTemplate = {
 			content: {
 				title: '無料ホワイトペーパーをダウンロード',
 				subtitle: 'ビジネス成功のための実践ガイド',
-				description: '業界のプロが作成した、実践的なノウハウが詰まったホワイトペーパーを無料でダウンロードできます。',
-				buttonText: 'ホワイトペーパーをダウンロード',
-				buttonLink: '#contact'
+				description: '業界のプロが作成した、実践的なノウハウが詰まったホワイトペーパーを無料でダウンロードできます。'
 			}
 		},
 		{
@@ -173,18 +171,25 @@ export const whitepaperTemplate: LPTemplate = {
 		},
 		{
 			id: 'template-whitepaper-contact',
-			type: 'contact',
+			type: 'two_column_image_contact',
 			order: 2,
 			content: {
-				title: 'ホワイトペーパーをダウンロード',
-				description: '以下のフォームに必要事項を入力して、ホワイトペーパーをダウンロードしてください。',
-				formFields: [
-					{ name: 'name', label: 'お名前', type: 'text', required: true },
-					{ name: 'email', label: 'メールアドレス', type: 'email', required: true },
-					{ name: 'company', label: '会社名', type: 'text', required: true },
-					{ name: 'position', label: '役職', type: 'text', required: false },
-					{ name: 'message', label: 'ご質問・ご要望', type: 'textarea', required: false }
-				]
+				imageColumn: {
+					textContent: {
+						title: 'お気軽にご連絡ください',
+						description: 'ホワイトペーパーのダウンロードや、サービスに関するご質問など、お気軽にお問い合わせください。'
+					},
+					imageUrl: '',
+					imageAlt: 'お問い合わせイメージ',
+					caption: ''
+				},
+				contactColumn: {
+					submitButtonText: '送信する',
+					useDedicatedPage: false
+				},
+				layout: {
+					ratio: '50-50'
+				}
 			}
 		}
 	]

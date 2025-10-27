@@ -126,16 +126,8 @@ export const actions = {
 				// システムテンプレート
 				const template = getTemplateById(templateId);
 				if (template) {
-					// テンプレートのセクション構造を公開LP表示用に変換
-					// section.content.* → section.* に展開
-					const transformedSections = template.sections.map((section) => {
-						const { id, type, order, content } = section;
-						return {
-							type,
-							...content // contentの中身を展開して直接セクションに配置
-						};
-					});
-					initialContent = { sections: transformedSections };
+					// テンプレートのセクション構造をそのまま使用（idを保持）
+					initialContent = { sections: template.sections };
 
 					console.log('テンプレート変換後:', JSON.stringify(initialContent, null, 2));
 				}

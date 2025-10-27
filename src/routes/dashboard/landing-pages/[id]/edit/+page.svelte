@@ -245,9 +245,13 @@
 		// セクションタイプに応じてフィールドを適用
 		if (section.type === 'contact') {
 			section.content.formFields = JSON.parse(JSON.stringify(template.fields));
-		} else if (section.type === 'two_column_text_contact' || section.type === 'two_column_contact_image') {
+			section.content.appliedTemplateId = templateId;
+			section.content.appliedTemplateName = template.name;
+		} else if (section.type === 'two_column_text_contact' || section.type === 'two_column_contact_image' || section.type === 'two_column_image_contact') {
 			if (!section.content.contactColumn) section.content.contactColumn = {};
 			section.content.contactColumn.formFields = JSON.parse(JSON.stringify(template.fields));
+			section.content.contactColumn.appliedTemplateId = templateId;
+			section.content.contactColumn.appliedTemplateName = template.name;
 		}
 
 		sections = [...sections]; // リアクティブ更新（新しい配列を作成）
@@ -459,6 +463,7 @@
 			| 'two_column_features_image'
 			| 'two_column_text_contact'
 			| 'two_column_contact_image'
+			| 'two_column_image_contact'
 	) {
 		const newSection: Section = {
 			id: `section-${Date.now()}`,
@@ -512,11 +517,6 @@
 				return {
 					title: 'お問い合わせ',
 					description: 'お気軽にお問い合わせください',
-					formFields: [
-						{ name: 'name', label: 'お名前', type: 'text', required: true },
-						{ name: 'email', label: 'メールアドレス', type: 'email', required: true },
-						{ name: 'message', label: 'お問い合わせ内容', type: 'textarea', required: true }
-					],
 					submitButtonText: '送信'
 				};
 			case 'pricing':
@@ -729,11 +729,6 @@
 						description: 'サービスに関するご質問や資料請求など、お気軽にお問い合わせください。担当者より折り返しご連絡いたします。'
 					},
 					contactColumn: {
-						formFields: [
-							{ name: 'name', label: 'お名前', type: 'text', required: true, placeholder: '山田 太郎' },
-							{ name: 'email', label: 'メールアドレス', type: 'email', required: true, placeholder: 'yamada@example.com' },
-							{ name: 'message', label: 'お問い合わせ内容', type: 'textarea', required: true, placeholder: 'お問い合わせ内容をご記入ください' }
-						],
 						submitButtonText: '送信する',
 						useDedicatedPage: false
 					},
@@ -744,12 +739,6 @@
 			case 'two_column_contact_image':
 				return {
 					contactColumn: {
-						formFields: [
-							{ name: 'name', label: 'お名前', type: 'text', required: true, placeholder: '山田 太郎' },
-							{ name: 'email', label: 'メールアドレス', type: 'email', required: true, placeholder: 'yamada@example.com' },
-							{ name: 'company', label: '会社名', type: 'text', required: false, placeholder: '株式会社サンプル' },
-							{ name: 'message', label: 'お問い合わせ内容', type: 'textarea', required: true, placeholder: 'お問い合わせ内容をご記入ください' }
-						],
 						submitButtonText: '送信する',
 						useDedicatedPage: false
 					},
@@ -757,6 +746,25 @@
 						imageUrl: '',
 						imageAlt: 'お問い合わせイメージ',
 						caption: ''
+					},
+					layout: {
+						ratio: '50-50' as const
+					}
+				};
+			case 'two_column_image_contact':
+				return {
+					imageColumn: {
+						imageUrl: '',
+						imageAlt: 'お問い合わせイメージ',
+						caption: '',
+						textContent: {
+							title: 'お気軽にご連絡ください',
+							description: 'サービスに関するご質問や資料請求など、お気軽にお問い合わせください。'
+						}
+					},
+					contactColumn: {
+						submitButtonText: '送信する',
+						useDedicatedPage: false
 					},
 					layout: {
 						ratio: '50-50' as const
@@ -2109,6 +2117,21 @@
 																	</option>
 																{/each}
 															</select>
+
+															<!-- 現在適用中のテンプレート表示 -->
+															{#if section.content.appliedTemplateName}
+																<div class="mt-2 p-2 bg-green-50 border border-green-300 rounded">
+																	<div class="flex items-center gap-2">
+																		<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+																			<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+																		</svg>
+																		<span class="text-xs font-medium text-green-800">
+																			適用中: {section.content.appliedTemplateName}
+																		</span>
+																	</div>
+																</div>
+															{/if}
+
 															<p class="text-xs text-blue-700 mt-2">
 																※ フォーム項目を変更する場合は
 																<a href="/dashboard/form-templates" target="_blank" class="text-blue-600 hover:underline font-medium">
@@ -2120,32 +2143,31 @@
 													</div>
 
 													<!-- 現在のフォーム項目表示（読み取り専用） -->
-													{#if !section.content.formFields}
-														{section.content.formFields = [
-															{ name: 'name', label: 'お名前', type: 'text', required: true, placeholder: '山田 太郎' },
-															{ name: 'email', label: 'メールアドレス', type: 'email', required: true, placeholder: 'yamada@example.com' },
-															{ name: 'message', label: 'お問い合わせ内容', type: 'textarea', required: true, placeholder: 'お問い合わせ内容をご記入ください' }
-														]}
-													{/if}
-
-													<div class="space-y-2">
-														<div class="text-xs font-medium text-gray-700 mb-1">現在の項目 ({section.content.formFields.length}個)</div>
-														{#each section.content.formFields as field, fieldIndex}
-															<div class="p-2 border border-gray-200 rounded bg-white">
-																<div class="flex items-center gap-2">
-																	<span class="text-xs text-gray-500">#{fieldIndex + 1}</span>
-																	<span class="flex-1 text-sm font-medium text-gray-900">{field.label}</span>
-																	<span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded">{field.type}</span>
-																	{#if field.required}
-																		<span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded font-medium">必須</span>
+													{#if section.content.formFields && section.content.formFields.length > 0}
+														<div class="space-y-2">
+															<div class="text-xs font-medium text-gray-700 mb-1">現在の項目 ({section.content.formFields.length}個)</div>
+															{#each section.content.formFields as field, fieldIndex}
+																<div class="p-2 border border-gray-200 rounded bg-white">
+																	<div class="flex items-center gap-2">
+																		<span class="text-xs text-gray-500">#{fieldIndex + 1}</span>
+																		<span class="flex-1 text-sm font-medium text-gray-900">{field.label}</span>
+																		<span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded">{field.type}</span>
+																		{#if field.required}
+																			<span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded font-medium">必須</span>
+																		{/if}
+																	</div>
+																	{#if field.placeholder}
+																		<div class="mt-1 text-xs text-gray-500">例: {field.placeholder}</div>
 																	{/if}
 																</div>
-																{#if field.placeholder}
-																	<div class="mt-1 text-xs text-gray-500">例: {field.placeholder}</div>
-																{/if}
-															</div>
-														{/each}
-													</div>
+															{/each}
+														</div>
+													{:else}
+														<div class="p-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg text-center">
+															<p class="text-sm text-gray-600">テンプレートが選択されていません</p>
+															<p class="text-xs text-gray-500 mt-1">上記からテンプレートを選択してください</p>
+														</div>
+													{/if}
 												</div>
 
 												<!-- 送信ボタンテキスト -->
@@ -3623,6 +3645,21 @@
 																		</option>
 																	{/each}
 																</select>
+
+																<!-- 現在適用中のテンプレート表示 -->
+																{#if section.content.contactColumn.appliedTemplateName}
+																	<div class="mt-1.5 p-1.5 bg-green-50 border border-green-300 rounded">
+																		<div class="flex items-center gap-1.5">
+																			<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+																				<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+																			</svg>
+																			<span class="text-xs font-medium text-green-800">
+																				適用中: {section.content.contactColumn.appliedTemplateName}
+																			</span>
+																		</div>
+																	</div>
+																{/if}
+
 																<p class="text-xs text-blue-700 mt-1">
 																	※ 項目変更は
 																	<a href="/dashboard/form-templates" target="_blank" class="text-blue-600 hover:underline font-medium">
@@ -3634,32 +3671,31 @@
 														</div>
 
 														<!-- 現在のフォーム項目表示（読み取り専用） -->
-														{#if !section.content.contactColumn.formFields}
-															{section.content.contactColumn.formFields = [
-																{ name: 'name', label: 'お名前', type: 'text', required: true, placeholder: '山田 太郎' },
-																{ name: 'email', label: 'メールアドレス', type: 'email', required: true, placeholder: 'yamada@example.com' },
-																{ name: 'message', label: 'お問い合わせ内容', type: 'textarea', required: true, placeholder: 'お問い合わせ内容をご記入ください' }
-															]}
-														{/if}
-
-														<div class="space-y-1.5">
-															<div class="text-xs font-medium text-blue-900 mb-1">現在の項目 ({section.content.contactColumn.formFields.length}個)</div>
-															{#each section.content.contactColumn.formFields as field, fieldIndex}
-																<div class="p-1.5 border border-blue-200 rounded bg-white">
-																	<div class="flex items-center gap-1.5">
-																		<span class="text-xs text-gray-500">#{fieldIndex + 1}</span>
-																		<span class="flex-1 text-xs font-medium text-gray-900">{field.label}</span>
-																		<span class="px-1.5 py-0.5 bg-gray-100 text-gray-700 text-xs rounded">{field.type}</span>
-																		{#if field.required}
-																			<span class="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded font-medium">必須</span>
+														{#if section.content.contactColumn.formFields && section.content.contactColumn.formFields.length > 0}
+															<div class="space-y-1.5">
+																<div class="text-xs font-medium text-blue-900 mb-1">現在の項目 ({section.content.contactColumn.formFields.length}個)</div>
+																{#each section.content.contactColumn.formFields as field, fieldIndex}
+																	<div class="p-1.5 border border-blue-200 rounded bg-white">
+																		<div class="flex items-center gap-1.5">
+																			<span class="text-xs text-gray-500">#{fieldIndex + 1}</span>
+																			<span class="flex-1 text-xs font-medium text-gray-900">{field.label}</span>
+																			<span class="px-1.5 py-0.5 bg-gray-100 text-gray-700 text-xs rounded">{field.type}</span>
+																			{#if field.required}
+																				<span class="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded font-medium">必須</span>
+																			{/if}
+																		</div>
+																		{#if field.placeholder}
+																			<div class="mt-0.5 text-xs text-gray-500">例: {field.placeholder}</div>
 																		{/if}
 																	</div>
-																	{#if field.placeholder}
-																		<div class="mt-0.5 text-xs text-gray-500">例: {field.placeholder}</div>
-																	{/if}
-																</div>
-															{/each}
-														</div>
+																{/each}
+															</div>
+														{:else}
+															<div class="p-3 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg text-center">
+																<p class="text-xs text-blue-800">テンプレートが選択されていません</p>
+																<p class="text-xs text-blue-600 mt-1">上記からテンプレートを選択してください</p>
+															</div>
+														{/if}
 													</div>
 
 													<div class="mt-2">
@@ -3786,6 +3822,21 @@
 																		</option>
 																	{/each}
 																</select>
+
+																<!-- 現在適用中のテンプレート表示 -->
+																{#if section.content.contactColumn.appliedTemplateName}
+																	<div class="mt-1.5 p-1.5 bg-green-50 border border-green-300 rounded">
+																		<div class="flex items-center gap-1.5">
+																			<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+																				<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+																			</svg>
+																			<span class="text-xs font-medium text-green-800">
+																				適用中: {section.content.contactColumn.appliedTemplateName}
+																			</span>
+																		</div>
+																	</div>
+																{/if}
+
 																<p class="text-xs text-blue-700 mt-1">
 																	※ 項目変更は
 																	<a href="/dashboard/form-templates" target="_blank" class="text-blue-600 hover:underline font-medium">
@@ -3797,32 +3848,31 @@
 														</div>
 
 														<!-- 現在のフォーム項目表示（読み取り専用） -->
-														{#if !section.content.contactColumn.formFields}
-															{section.content.contactColumn.formFields = [
-																{ name: 'name', label: 'お名前', type: 'text', required: true, placeholder: '山田 太郎' },
-																{ name: 'email', label: 'メールアドレス', type: 'email', required: true, placeholder: 'yamada@example.com' },
-																{ name: 'message', label: 'お問い合わせ内容', type: 'textarea', required: true, placeholder: 'お問い合わせ内容をご記入ください' }
-															]}
-														{/if}
-
-														<div class="space-y-1.5">
-															<div class="text-xs font-medium text-blue-900 mb-1">現在の項目 ({section.content.contactColumn.formFields.length}個)</div>
-															{#each section.content.contactColumn.formFields as field, fieldIndex}
-																<div class="p-1.5 border border-blue-200 rounded bg-white">
-																	<div class="flex items-center gap-1.5">
-																		<span class="text-xs text-gray-500">#{fieldIndex + 1}</span>
-																		<span class="flex-1 text-xs font-medium text-gray-900">{field.label}</span>
-																		<span class="px-1.5 py-0.5 bg-gray-100 text-gray-700 text-xs rounded">{field.type}</span>
-																		{#if field.required}
-																			<span class="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded font-medium">必須</span>
+														{#if section.content.contactColumn.formFields && section.content.contactColumn.formFields.length > 0}
+															<div class="space-y-1.5">
+																<div class="text-xs font-medium text-blue-900 mb-1">現在の項目 ({section.content.contactColumn.formFields.length}個)</div>
+																{#each section.content.contactColumn.formFields as field, fieldIndex}
+																	<div class="p-1.5 border border-blue-200 rounded bg-white">
+																		<div class="flex items-center gap-1.5">
+																			<span class="text-xs text-gray-500">#{fieldIndex + 1}</span>
+																			<span class="flex-1 text-xs font-medium text-gray-900">{field.label}</span>
+																			<span class="px-1.5 py-0.5 bg-gray-100 text-gray-700 text-xs rounded">{field.type}</span>
+																			{#if field.required}
+																				<span class="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded font-medium">必須</span>
+																			{/if}
+																		</div>
+																		{#if field.placeholder}
+																			<div class="mt-0.5 text-xs text-gray-500">例: {field.placeholder}</div>
 																		{/if}
 																	</div>
-																	{#if field.placeholder}
-																		<div class="mt-0.5 text-xs text-gray-500">例: {field.placeholder}</div>
-																	{/if}
-																</div>
-															{/each}
-														</div>
+																{/each}
+															</div>
+														{:else}
+															<div class="p-3 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg text-center">
+																<p class="text-xs text-blue-800">テンプレートが選択されていません</p>
+																<p class="text-xs text-blue-600 mt-1">上記からテンプレートを選択してください</p>
+															</div>
+														{/if}
 													</div>
 
 													<div class="mt-2">
@@ -3916,10 +3966,235 @@
 													</select>
 												</div>
 											</div>
+										{:else if section.type === 'two_column_image_contact'}
+											<div class="space-y-4">
+												<!-- 画像カラム -->
+												<div class="p-3 bg-gray-50 rounded border border-gray-200">
+													<h5 class="text-xs font-semibold text-gray-700 mb-3">画像カラム</h5>
+													<div class="space-y-3">
+														<!-- テキスト内容 -->
+														<div class="p-2 bg-white rounded border border-gray-200">
+															<label class="block text-xs font-medium text-gray-700 mb-1">タイトル</label>
+															<input
+																type="text"
+																bind:value={section.content.imageColumn.textContent.title}
+																class="w-full px-2 py-1 border rounded text-sm mb-2"
+																placeholder="お気軽にご連絡ください"
+															/>
+															<label class="block text-xs font-medium text-gray-700 mb-1">説明文</label>
+															<textarea
+																bind:value={section.content.imageColumn.textContent.description}
+																class="w-full px-2 py-1 border rounded text-sm"
+																rows="3"
+																placeholder="サービスに関するご質問や資料請求など..."
+															></textarea>
+														</div>
+
+														<!-- 画像 -->
+														<div>
+															<label class="block text-xs font-medium text-gray-600 mb-1">画像URL</label>
+															<div class="flex gap-2">
+																<input
+																	type="text"
+																	bind:value={section.content.imageColumn.imageUrl}
+																	class="flex-1 px-2 py-1 border rounded text-sm"
+																	placeholder="https://..."
+																/>
+																<button
+																	on:click={() => openImagePicker(i, 'imageColumn.imageUrl')}
+																	class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 whitespace-nowrap"
+																>
+																	画像を選択
+																</button>
+															</div>
+														</div>
+														<div>
+															<label class="block text-xs font-medium text-gray-600 mb-1">画像の説明（Alt）</label>
+															<input
+																type="text"
+																bind:value={section.content.imageColumn.imageAlt}
+																class="w-full px-2 py-1 border rounded text-sm"
+															/>
+														</div>
+													</div>
+												</div>
+
+												<!-- 問い合わせカラム -->
+												<div class="p-3 bg-blue-50 rounded border-2 border-blue-200">
+													<h5 class="text-xs font-semibold text-blue-900 mb-2">問い合わせカラム</h5>
+
+													<!-- 専用ページモード -->
+													<div class="mb-3 p-2 bg-white rounded border border-blue-200">
+														<label class="flex items-center gap-2 cursor-pointer">
+															<input
+																type="checkbox"
+																bind:checked={section.content.contactColumn.useDedicatedPage}
+																class="w-4 h-4 text-blue-600 rounded"
+															/>
+															<span class="text-sm font-semibold text-blue-900">専用ページボタン表示</span>
+														</label>
+														{#if section.content.contactColumn.useDedicatedPage}
+															<div class="mt-2">
+																<label class="block text-xs font-medium text-blue-900 mb-1">ボタンテキスト</label>
+																<input
+																	type="text"
+																	bind:value={section.content.contactColumn.dedicatedPageButtonText}
+																	placeholder="お問い合わせはこちら"
+																	class="w-full px-2 py-1 border rounded text-sm"
+																/>
+															</div>
+														{/if}
+													</div>
+
+													<!-- フォーム項目 -->
+													<div class="mb-2">
+														<!-- テンプレート選択 -->
+														<div class="mb-2 p-2 bg-white border border-blue-300 rounded">
+															<label class="block text-xs font-medium text-blue-900 mb-1">テンプレートを選択</label>
+															{#if loadingFormTemplates}
+																<p class="text-xs text-gray-500">読み込み中...</p>
+															{:else if formTemplates.length === 0}
+																<p class="text-xs text-gray-600">
+																	テンプレートがありません。
+																	<a href="/dashboard/form-templates" target="_blank" class="text-blue-600 hover:underline">
+																		テンプレートを作成
+																	</a>
+																</p>
+															{:else}
+																<select
+																	class="w-full px-2 py-1.5 border border-blue-300 rounded text-xs bg-white"
+																	on:change={(e) => {
+																		const templateId = e.currentTarget.value;
+																		if (templateId) {
+																			applyFormTemplate(i, templateId);
+																			e.currentTarget.value = '';
+																		}
+																	}}
+																>
+																	<option value="">テンプレートを選択してください</option>
+																	{#each formTemplates as template}
+																		<option value={template.id}>
+																			{template.name}
+																			{#if template.is_default}(デフォルト){/if}
+																		</option>
+																	{/each}
+																</select>
+
+																<!-- 現在適用中のテンプレート表示 -->
+																{#if section.content.contactColumn.appliedTemplateName}
+																	<div class="mt-1.5 p-1.5 bg-green-50 border border-green-300 rounded">
+																		<div class="flex items-center gap-1.5">
+																			<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+																				<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+																			</svg>
+																			<span class="text-xs font-medium text-green-800">
+																				適用中: {section.content.contactColumn.appliedTemplateName}
+																			</span>
+																		</div>
+																	</div>
+																{/if}
+
+																<p class="text-xs text-blue-700 mt-1">
+																	※ 項目変更は
+																	<a href="/dashboard/form-templates" target="_blank" class="text-blue-600 hover:underline font-medium">
+																		テンプレート管理
+																	</a>
+																	から
+																</p>
+															{/if}
+														</div>
+
+														<!-- 現在のフォーム項目表示（読み取り専用） -->
+														{#if section.content.contactColumn.formFields && section.content.contactColumn.formFields.length > 0}
+															<div class="space-y-1.5">
+																<div class="text-xs font-medium text-blue-900 mb-1">現在の項目 ({section.content.contactColumn.formFields.length}個)</div>
+																{#each section.content.contactColumn.formFields as field, fieldIndex}
+																	<div class="p-1.5 border border-blue-200 rounded bg-white">
+																		<div class="flex items-center gap-1.5">
+																			<span class="text-xs text-gray-500">#{fieldIndex + 1}</span>
+																			<span class="flex-1 text-xs font-medium text-gray-900">{field.label}</span>
+																			<span class="px-1.5 py-0.5 bg-gray-100 text-gray-700 text-xs rounded">{field.type}</span>
+																			{#if field.required}
+																				<span class="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded font-medium">必須</span>
+																			{/if}
+																		</div>
+																		{#if field.placeholder}
+																			<div class="mt-0.5 text-xs text-gray-500">例: {field.placeholder}</div>
+																		{/if}
+																	</div>
+																{/each}
+															</div>
+														{:else}
+															<div class="p-3 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg text-center">
+																<p class="text-xs text-blue-800">テンプレートが選択されていません</p>
+																<p class="text-xs text-blue-600 mt-1">上記からテンプレートを選択してください</p>
+															</div>
+														{/if}
+													</div>
+
+													<div class="mt-2">
+														<label class="block text-xs font-medium text-blue-900 mb-1">送信ボタンテキスト</label>
+														<input
+															type="text"
+															bind:value={section.content.contactColumn.submitButtonText}
+															placeholder="送信する"
+															class="w-full px-2 py-1 border rounded text-sm"
+														/>
+													</div>
+
+													<!-- 自動返信メール設定 -->
+													<div class="mt-3 p-3 bg-white border border-blue-200 rounded-lg">
+														<h4 class="text-sm font-semibold text-blue-900 mb-2">自動返信メール</h4>
+														<div class="space-y-2">
+															<label class="flex items-center gap-2">
+																<input
+																	type="checkbox"
+																	bind:checked={section.content.contactColumn.autoReplyEnabled}
+																	class="w-4 h-4 text-blue-600 rounded"
+																/>
+																<span class="text-sm text-gray-700">自動返信メールを送信する</span>
+															</label>
+
+															{#if section.content.contactColumn.autoReplyEnabled}
+																<div>
+																	<label class="block text-xs font-medium text-gray-700 mb-1">メール設定を選択</label>
+																	<select
+																		bind:value={section.content.contactColumn.autoReplyEmailSettingId}
+																		class="w-full px-2 py-1.5 border rounded text-sm bg-white"
+																	>
+																		<option value="">選択してください</option>
+																		{#each emailSettings as setting}
+																			<option value={setting.id}>{setting.name}</option>
+																		{/each}
+																	</select>
+																	{#if emailSettings.length === 0}
+																		<p class="text-xs text-gray-500 mt-1">
+																			メール設定がありません。
+																			<a href="/dashboard/email-settings" target="_blank" class="text-blue-600 hover:underline">
+																				メール設定を作成
+																			</a>
+																		</p>
+																	{/if}
+																</div>
+															{/if}
+														</div>
+													</div>
+												</div>
+
+												<!-- レイアウト -->
+												<div class="p-3 bg-gray-50 rounded border border-gray-200">
+													<h5 class="text-xs font-semibold text-gray-700 mb-2">カラム比率</h5>
+													<select bind:value={section.content.layout.ratio} class="w-full px-2 py-1 border rounded text-sm">
+														<option value="50-50">50% - 50%</option>
+														<option value="60-40">60% - 40%</option>
+														<option value="40-60">40% - 60%</option>
+													</select>
+												</div>
+											</div>
 										{/if}
 
 										<!-- その他のセクションタイプ用のプレースホルダー -->
-										{#if !['hero', 'features', 'cta', 'contact', 'gallery', 'two_column_text_image', 'two_column_image_text', 'two_column_text_video', 'two_column_features_image', 'two_column_text_contact', 'two_column_contact_image'].includes(section.type)}
+										{#if !['hero', 'features', 'cta', 'contact', 'gallery', 'two_column_text_image', 'two_column_image_text', 'two_column_text_video', 'two_column_features_image', 'two_column_text_contact', 'two_column_contact_image', 'two_column_image_contact'].includes(section.type)}
 											<p class="text-sm text-gray-500">このセクションタイプのコンテンツ編集は開発中です</p>
 										{/if}
 									</div>
@@ -4144,6 +4419,17 @@
 									<ImageIcon size={24} />
 								</div>
 								<span class="text-sm font-semibold">問い合わせ + 画像</span>
+								<span class="text-xs text-gray-500 mt-1">2カラム</span>
+							</button>
+							<button
+								on:click={() => addSection('two_column_image_contact')}
+								class="flex flex-col items-center justify-center px-4 py-6 bg-white border-2 border-orange-200 text-orange-700 rounded-lg hover:bg-orange-50 transition"
+							>
+								<div class="flex items-center gap-1 mb-2">
+									<ImageIcon size={24} />
+									<Mail size={24} />
+								</div>
+								<span class="text-sm font-semibold">画像 + 問い合わせ</span>
 								<span class="text-xs text-gray-500 mt-1">2カラム</span>
 							</button>
 						</div>

@@ -68,5 +68,33 @@ export const actions = {
 		}
 
 		return { success: true, message: `ステータスを「${newStatus}」に変更しました` };
+	},
+
+	deleteLP: async ({ request, locals }) => {
+		const session = await locals.getSession();
+		if (!session) {
+			return fail(401, { message: '認証が必要です' });
+		}
+
+		const formData = await request.formData();
+		const lpId = formData.get('lp_id') as string;
+
+		if (!lpId) {
+			return fail(400, { message: 'LP IDが必要です' });
+		}
+
+		// LPを削除
+		const { error } = await locals.supabase
+			.from('landing_pages')
+			.delete()
+			.eq('id', lpId)
+			.eq('user_id', session.user.id);
+
+		if (error) {
+			console.error('Error deleting LP:', error);
+			return fail(500, { message: 'LPの削除に失敗しました' });
+		}
+
+		return { success: true, message: 'LPを削除しました' };
 	}
 } satisfies Actions;

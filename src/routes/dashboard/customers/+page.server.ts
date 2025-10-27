@@ -11,7 +11,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const search = url.searchParams.get('search') || '';
 	const status = url.searchParams.get('status') || '';
 
-	// クエリの構築（LP情報も取得）
+	// クエリの構築（LP情報とcustom_fieldsも取得）
 	let query = locals.supabase
 		.from('customers')
 		.select('*, landing_pages(id, title, slug)', { count: 'exact' })
