@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { sendEmail, replaceTemplateVariables } from '$lib/utils/sendEmail';
+import { sendEmail, replaceTemplateVariables, textToHtml } from '$lib/utils/sendEmail';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
@@ -122,7 +122,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					};
 
 					const subject = replaceTemplateVariables(emailSetting.subject || 'お問い合わせありがとうございます', variables);
-					const body = replaceTemplateVariables(emailSetting.body || '', variables);
+					const bodyText = replaceTemplateVariables(emailSetting.body || '', variables);
+					const body = textToHtml(bodyText); // 改行を<br>タグに変換
 
 					// SMTP設定
 					const smtpConfig = {

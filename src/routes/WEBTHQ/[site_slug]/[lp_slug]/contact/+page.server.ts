@@ -1,6 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
-import { sendEmail, replaceTemplateVariables } from '$lib/utils/sendEmail';
+import { sendEmail, replaceTemplateVariables, textToHtml } from '$lib/utils/sendEmail';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const { site_slug, lp_slug } = params;
@@ -271,7 +271,8 @@ export const actions = {
 							emailSetting.subject || 'お問い合わせありがとうございます',
 							variables
 						);
-						const body = replaceTemplateVariables(emailSetting.body || '', variables);
+						const bodyText = replaceTemplateVariables(emailSetting.body || '', variables);
+						const body = textToHtml(bodyText); // 改行を<br>タグに変換
 
 						// SMTP設定
 						const smtpConfig = {

@@ -60,3 +60,14 @@ export function replaceTemplateVariables(
 
 	return result;
 }
+
+/**
+ * テキストをHTML形式に変換（改行を<br>タグに変換）
+ */
+export function textToHtml(text: string): string {
+	return text
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/\n/g, '<br>');
+}
