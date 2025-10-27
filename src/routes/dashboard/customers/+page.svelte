@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import type { ActionData, PageData } from './$types';
 
 	export let data: PageData;
@@ -16,6 +17,78 @@
 	let emailLogs: any[] = [];
 	let loadingEmailLogs = false;
 	let activeTab: 'info' | 'emails' = 'info';
+
+	// 現在選択中のフォームテンプレートID（URLパラメータから取得）
+	$: selectedFormTemplateId = $page.url.searchParams.get('form_template') || '';
+
+	// フォームテンプレート毎の表示列定義
+	function getColumnsForTemplate(templateId: string, template: any) {
+		if (!templateId) {
+			// すべて表示（デフォルト）
+			return [
+				{ key: 'name', label: '名前' },
+				{ key: 'email', label: 'メール' },
+				{ key: 'company', label: '会社名' },
+				{ key: 'phone', label: '電話番号' },
+				{ key: 'status', label: 'ステータス' },
+				{ key: 'created_at', label: '登録日' }
+			];
+		}
+
+		// テンプレートのフィールド定義から動的に列を生成
+		const columns = [
+			{ key: 'name', label: '名前' },
+			{ key: 'email', label: 'メール' }
+		];
+
+		if (template?.fields) {
+			template.fields.forEach((field: any) => {
+				// 既に追加されているフィールドはスキップ
+				if (field.name === 'name' || field.name === 'email') return;
+
+				// 標準フィールド
+				if (field.name === 'company' || field.name === 'company_name') {
+					columns.push({ key: 'company', label: '会社名' });
+				} else if (field.name === 'phone') {
+					columns.push({ key: 'phone', label: '電話番号' });
+				} else {
+					// カスタムフィールド
+					columns.push({ key: `custom_fields.${field.name}`, label: field.label });
+				}
+			});
+		}
+
+		columns.push({ key: 'status', label: 'ステータス' });
+		columns.push({ key: 'created_at', label: '登録日' });
+
+		return columns;
+	}
+
+	// 現在選択中のテンプレート
+	$: currentTemplate = data.formTemplates.find(t => t.id === selectedFormTemplateId);
+
+	// 表示する列
+	$: displayColumns = getColumnsForTemplate(selectedFormTemplateId, currentTemplate);
+
+	// 列の値を取得（ネストされたオブジェクトにも対応）
+	function getColumnValue(customer: any, key: string) {
+		if (key.startsWith('custom_fields.')) {
+			const fieldName = key.replace('custom_fields.', '');
+			return customer.custom_fields?.[fieldName] || '-';
+		}
+		return customer[key] || '-';
+	}
+
+	// タブ切り替え
+	function switchFormTemplate(templateId: string) {
+		const url = new URL(window.location.href);
+		if (templateId) {
+			url.searchParams.set('form_template', templateId);
+		} else {
+			url.searchParams.delete('form_template');
+		}
+		goto(url.toString(), { replaceState: true, keepFocus: true });
+	}
 
 	// ステータスの日本語表示
 	function getStatusLabel(status: string) {
@@ -166,6 +239,20 @@
 				/>
 			</div>
 			<select
+				name="form_template"
+				value={selectedFormTemplateId}
+				on:change={(e) => switchFormTemplate(e.currentTarget.value)}
+				class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[200px]"
+			>
+				<option value="">すべてのフォーム ({data.customers.length})</option>
+				{#each data.formTemplates as template}
+					{@const count = data.customers.filter(c => c.custom_fields?._meta?.form_template_id === template.id).length}
+					<option value={template.id}>
+						{template.name} ({count})
+					</option>
+				{/each}
+			</select>
+			<select
 				name="status"
 				class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 			>
@@ -202,23 +289,12 @@
 			<table class="min-w-full divide-y divide-gray-200">
 				<thead class="bg-gray-50">
 					<tr>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">名前</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-							メール
-						</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">会社</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-							送信元
-						</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-							問い合わせ
-						</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-							ステータス
-						</th>
-						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-							登録日
-						</th>
+						<!-- 動的ヘッダー -->
+						{#each displayColumns as column}
+							<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+								{column.label}
+							</th>
+						{/each}
 						<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
 							アクション
 						</th>
@@ -227,49 +303,33 @@
 				<tbody class="bg-white divide-y divide-gray-200">
 					{#each data.customers as customer}
 						<tr class="hover:bg-gray-50">
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="font-medium text-gray-900">{customer.name}</div>
-								{#if customer.position}
-									<div class="text-sm text-gray-500">{customer.position}</div>
-								{/if}
-							</td>
-							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{customer.email}</td>
-							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-								{customer.company || '-'}
-							</td>
-							<td class="px-6 py-4 text-sm text-gray-600">
-								{#if customer.landing_pages}
-									<div class="font-medium text-gray-900">{customer.landing_pages.title}</div>
-									{#if customer.custom_fields?._meta?.form_template_name}
-										<div class="text-xs text-gray-500 mt-1">
-											フォーム: {customer.custom_fields._meta.form_template_name}
-										</div>
+							<!-- 動的セル -->
+							{#each displayColumns as column}
+								<td class="px-6 py-4 whitespace-nowrap">
+									{#if column.key === 'status'}
+										<span class="px-2 py-1 text-xs font-medium rounded-full {getStatusColor(customer.status)}">
+											{getStatusLabel(customer.status)}
+										</span>
+									{:else if column.key === 'created_at'}
+										<span class="text-sm text-gray-900">{formatDate(customer.created_at)}</span>
+									{:else if column.key === 'name'}
+										<div class="font-medium text-gray-900">{customer.name || '-'}</div>
+										{#if customer.position}
+											<div class="text-sm text-gray-500">{customer.position}</div>
+										{/if}
+									{:else}
+										<span class="text-sm text-gray-900">{getColumnValue(customer, column.key)}</span>
 									{/if}
-								{:else}
-									<span class="text-gray-400">-</span>
-								{/if}
-							</td>
-							<td class="px-6 py-4 text-sm">
-								{#if customer.custom_fields && Object.keys(customer.custom_fields).filter(k => k !== '_meta').length > 0}
-									<button
-										on:click={() => openDetailsModal(customer)}
-										class="text-blue-600 hover:text-blue-800 underline"
-									>
-										詳細を見る
-									</button>
-								{:else}
-									<span class="text-gray-400">-</span>
-								{/if}
-							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<span class="px-2 py-1 text-xs rounded-full {getStatusColor(customer.status)}">
-									{getStatusLabel(customer.status)}
-								</span>
-							</td>
-							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-								{formatDate(customer.created_at)}
-							</td>
+								</td>
+							{/each}
+							<!-- アクション列 -->
 							<td class="px-6 py-4 whitespace-nowrap text-sm">
+								<button
+									on:click={() => openDetailsModal(customer)}
+									class="text-gray-600 hover:text-gray-800 mr-3"
+								>
+									詳細
+								</button>
 								<button
 									on:click={() => openEditModal(customer)}
 									class="text-blue-600 hover:text-blue-800 mr-3"

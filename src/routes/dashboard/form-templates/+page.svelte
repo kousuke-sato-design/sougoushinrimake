@@ -1,12 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { FileText, Plus, Edit, Trash2, Check, X, Copy } from 'lucide-svelte';
+	import { FileText, Plus, Edit, Trash2, Check, X, Copy, Users } from 'lucide-svelte';
 	import type { FormTemplate, FormTemplateInput, FormField } from '$lib/types/form';
+	import type { PageData } from './$types';
 	import { DEFAULT_FORM_TEMPLATES } from '$lib/types/form';
 	import { supabase } from '$lib/supabaseClient';
 
-	let templates: FormTemplate[] = [];
-	let loading = true;
+	export let data: PageData;
+
+	let templates: FormTemplate[] = data.templates || [];
+	let customerCounts: Record<string, number> = data.customerCounts || {};
+	let loading = false;
 	let showModal = false;
 	let editingId: string | null = null;
 	let error = '';
@@ -20,19 +24,33 @@
 	};
 
 	onMount(async () => {
-		await loadTemplates();
+		// データはサーバーサイドから取得済み
 	});
 
 	async function loadTemplates() {
 		loading = true;
 		try {
-			const { data, error: err } = await supabase
+			const { data: templatesData, error: err } = await supabase
 				.from('form_templates')
 				.select('*')
 				.order('created_at', { ascending: false });
 
 			if (err) throw err;
-			templates = data || [];
+			templates = templatesData || [];
+
+			// 各テンプレートの顧客数を再取得
+			const { data: { session } } = await supabase.auth.getSession();
+			if (session) {
+				for (const template of templates) {
+					const { count } = await supabase
+						.from('customers')
+						.select('*', { count: 'exact', head: true })
+						.eq('user_id', session.user.id)
+						.contains('custom_fields', { _meta: { form_template_id: template.id } });
+
+					customerCounts[template.id] = count || 0;
+				}
+			}
 		} catch (err: any) {
 			console.error('Error loading form templates:', err);
 			error = 'フォームテンプレートの読み込みに失敗しました';
@@ -241,9 +259,20 @@
 											</span>
 										{/each}
 									</div>
-									<p class="text-gray-500 text-xs mt-2">
-										作成日: {new Date(template.created_at).toLocaleString('ja-JP')}
-									</p>
+									<div class="flex items-center gap-4 mt-3">
+										<p class="text-gray-500 text-xs">
+											作成日: {new Date(template.created_at).toLocaleString('ja-JP')}
+										</p>
+										{#if customerCounts[template.id] !== undefined}
+											<a
+												href="/dashboard/customers?form_template={template.id}"
+												class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition"
+											>
+												<Users size={14} />
+												<span>顧客 {customerCounts[template.id]}件</span>
+											</a>
+										{/if}
+									</div>
 								</div>
 							</div>
 							<div class="flex gap-2">

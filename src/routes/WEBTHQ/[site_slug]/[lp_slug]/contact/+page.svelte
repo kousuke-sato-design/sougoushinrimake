@@ -103,6 +103,7 @@
 									<div class="ml-3">
 										<h3 class="text-lg font-semibold text-green-800">送信完了</h3>
 										<p class="text-green-700 mt-1">{form.message}</p>
+
 									</div>
 								</div>
 							</div>
@@ -251,6 +252,7 @@
 							<div class="ml-3">
 								<h3 class="text-lg font-semibold text-green-800">送信完了</h3>
 								<p class="text-green-700 mt-1">{form.message}</p>
+
 							</div>
 						</div>
 					</div>

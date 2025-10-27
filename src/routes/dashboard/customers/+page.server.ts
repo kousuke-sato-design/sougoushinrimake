@@ -4,12 +4,20 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const session = await locals.getSession();
 	if (!session) {
-		return { customers: [], total: 0 };
+		return { customers: [], total: 0, formTemplates: [] };
 	}
 
 	// 検索・フィルターパラメータ
 	const search = url.searchParams.get('search') || '';
 	const status = url.searchParams.get('status') || '';
+	const formTemplateId = url.searchParams.get('form_template') || '';
+
+	// フォームテンプレート一覧を取得
+	const { data: formTemplates } = await locals.supabase
+		.from('form_templates')
+		.select('id, name, fields')
+		.eq('user_id', session.user.id)
+		.order('created_at', { ascending: false });
 
 	// クエリの構築（LP情報とcustom_fieldsも取得）
 	let query = locals.supabase
@@ -27,6 +35,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		query = query.eq('status', status);
 	}
 
+	// フォームテンプレートフィルター（custom_fields._meta.form_template_idで絞り込み）
+	if (formTemplateId) {
+		query = query.contains('custom_fields', { _meta: { form_template_id: formTemplateId } });
+	}
+
 	// 並び替え（最新順）
 	query = query.order('created_at', { ascending: false });
 
@@ -41,7 +54,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	return {
 		customers: mappedCustomers,
-		total: count || 0
+		total: count || 0,
+		formTemplates: formTemplates || []
 	};
 };
 

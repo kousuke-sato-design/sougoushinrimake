@@ -245,12 +245,14 @@
 		// セクションタイプに応じてフィールドを適用
 		if (section.type === 'contact') {
 			section.content.formFields = JSON.parse(JSON.stringify(template.fields));
-			section.content.appliedTemplateId = templateId;
+			section.content.formTemplateId = templateId; // 問い合わせフォーム送信で使用
+			section.content.appliedTemplateId = templateId; // 表示用（後方互換性）
 			section.content.appliedTemplateName = template.name;
 		} else if (section.type === 'two_column_text_contact' || section.type === 'two_column_contact_image' || section.type === 'two_column_image_contact') {
 			if (!section.content.contactColumn) section.content.contactColumn = {};
 			section.content.contactColumn.formFields = JSON.parse(JSON.stringify(template.fields));
-			section.content.contactColumn.appliedTemplateId = templateId;
+			section.content.contactColumn.formTemplateId = templateId; // 問い合わせフォーム送信で使用
+			section.content.contactColumn.appliedTemplateId = templateId; // 表示用（後方互換性）
 			section.content.contactColumn.appliedTemplateName = template.name;
 		}
 

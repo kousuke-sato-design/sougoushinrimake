@@ -189,22 +189,6 @@ export const actions = {
 				});
 			}
 
-			// 顧客データを保存
-			const { data: customer, error: customerError } = await locals.supabase
-				.from('customers')
-				.insert(customerData)
-				.select()
-				.single();
-
-			if (customerError) {
-				console.error('Customer insert error:', customerError);
-				console.error('Customer data attempted:', JSON.stringify(customerData, null, 2));
-				return fail(500, {
-					message: `顧客データの保存に失敗しました: ${customerError.message || JSON.stringify(customerError)}`,
-					success: false
-				});
-			}
-
 			// お問い合わせセクションから自動返信メール設定とフォーム情報を取得
 			const sections = landingPage.content?.sections || [];
 			const contactSection = sections.find(
@@ -222,7 +206,8 @@ export const actions = {
 				contactSection?.content?.formTemplateId ||
 				contactSection?.content?.contactColumn?.formTemplateId;
 
-			// フォームテンプレート情報を取得してメタデータに保存
+
+			// フォームテンプレート情報を取得してメタデータに保存（保存前に設定）
 			if (formTemplateId) {
 				try {
 					const { data: formTemplate } = await locals.supabase
@@ -243,6 +228,55 @@ export const actions = {
 					console.error('Form template fetch error:', err);
 				}
 			}
+
+		// 既存顧客を確認
+		const { data: existingCustomer } = await locals.supabase
+			.from('customers')
+			.select('id')
+			.eq('user_id', landingPage.user_id)
+			.eq('email', customerData.email)
+			.maybeSingle();
+
+		let customer;
+
+		if (existingCustomer) {
+			// 既存顧客を更新
+			const { data: updatedCustomer, error: updateError } = await locals.supabase
+				.from('customers')
+				.update({
+					...customerData,
+					updated_at: new Date().toISOString()
+				})
+				.eq('id', existingCustomer.id)
+				.select()
+				.single();
+
+			if (updateError) {
+				console.error('Customer update error:', updateError);
+				return fail(500, {
+					message: `顧客データの更新に失敗しました: ${updateError.message}`,
+					success: false
+				});
+			}
+			customer = updatedCustomer;
+		} else {
+			// 新規顧客を作成
+			const { data: newCustomer, error: insertError } = await locals.supabase
+				.from('customers')
+				.insert(customerData)
+				.select()
+				.single();
+
+			if (insertError) {
+				console.error('Customer insert error:', insertError);
+				console.error('Customer data attempted:', JSON.stringify(customerData, null, 2));
+				return fail(500, {
+					message: `顧客データの保存に失敗しました: ${insertError.message}`,
+					success: false
+				});
+			}
+			customer = newCustomer;
+		}
 
 			// 自動返信メール送信（オプション）
 			if (autoReplyEmailSettingId && customerData.email) {
